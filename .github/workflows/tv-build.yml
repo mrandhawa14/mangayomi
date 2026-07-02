@@ -57,12 +57,12 @@ jobs:
       - name: Setup ninja
         uses: seanmiddleditch/gha-setup-ninja@master
 
-      # Cache the compiled Rust crate (rust/) so the native bridge isn't rebuilt
-      # from scratch every run — the single biggest repeat-build speedup.
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: rust
+      # NOTE: intentionally NOT caching the Rust target/ dir (Swatinem/rust-cache).
+      # A warm Rust cache reaches the native link stage faster and collides with
+      # Gradle's peak memory on the 7 GB runner, killing the linker
+      # ("clang: error: linker command failed due to signal"). Recompiling the
+      # crate cold each run is slower but reliable; the frb binary + Gradle caches
+      # below still cut most of the repeat-build time.
 
       # Cache the frb codegen binary so `cargo install` (a multi-minute compile)
       # only runs on the first build, not every time.
