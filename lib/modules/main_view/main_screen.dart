@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:mangayomi/modules/widgets/focus_highlight.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -665,6 +666,10 @@ class _TabletLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final destinations = buildNavigationWidgetsDesktop(ref, dest, context);
+    final selectedIndex =
+        (currentIndex >= 0 && currentIndex < destinations.length)
+        ? currentIndex
+        : 0;
     return Row(
       children: [
         AnimatedContainer(
@@ -672,25 +677,37 @@ class _TabletLayout extends StatelessWidget {
           width: _getNavigationRailWidth(isLongPressed, location),
           child: Stack(
             children: [
-              NavigationRailTheme(
-                data: NavigationRailThemeData(
-                  indicatorShape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-                child: NavigationRail(
-                  labelType: NavigationRailLabelType.all,
-                  useIndicator: true,
+              // Android TV / d-pad: a custom rail whose destinations are real
+              // focusable tiles showing the same primary-colour focus ring as
+              // the library cards. NavigationRail's built-in focus highlight is
+              // too faint to see on a TV, and directional focus can now move in
+              // and out of the tabs like any other focusable widget — so the
+              // tab bar is both reachable and visibly focused with a remote.
+              if (isTv)
+                _TvNavigationRail(
                   destinations: destinations,
-                  selectedIndex:
-                      (currentIndex >= 0 && currentIndex < destinations.length)
-                      ? currentIndex
-                      : 0,
+                  selectedIndex: selectedIndex,
                   onDestinationSelected: (newIndex) {
                     route.go(dest[newIndex]);
                   },
+                )
+              else
+                NavigationRailTheme(
+                  data: NavigationRailThemeData(
+                    indicatorShape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: NavigationRail(
+                    labelType: NavigationRailLabelType.all,
+                    useIndicator: true,
+                    destinations: destinations,
+                    selectedIndex: selectedIndex,
+                    onDestinationSelected: (newIndex) {
+                      route.go(dest[newIndex]);
+                    },
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -714,6 +731,91 @@ class _TabletLayout extends StatelessWidget {
     };
 
     return (location == null || validLocations.contains(location)) ? 100 : 0;
+  }
+}
+
+/// Android TV / d-pad navigation rail. Renders the same destinations as the
+/// desktop [NavigationRail], but each one is a real focusable tile ([InkWell]
+/// via [FocusHighlight]) so a remote can move focus onto the tabs and the
+/// focused tab shows the app's primary-colour ring — the built-in rail only
+/// highlights the *selected* item, which made the tab bar look unresponsive on
+/// a TV. Reuses `destination.icon` / `.selectedIcon` / `.label`, so labels and
+/// badge widgets stay identical to the desktop rail.
+class _TvNavigationRail extends StatelessWidget {
+  const _TvNavigationRail({
+    required this.destinations,
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+  });
+
+  final List<NavigationRailDestination> destinations;
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          const SizedBox(height: 8),
+          for (int i = 0; i < destinations.length; i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: FocusHighlight(
+                borderRadius: const BorderRadius.all(Radius.circular(16)),
+                onTap: () => onDestinationSelected(i),
+                child: _TvRailTileContent(
+                  destination: destinations[i],
+                  selected: i == selectedIndex,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TvRailTileContent extends StatelessWidget {
+  const _TvRailTileContent({required this.destination, required this.selected});
+
+  final NavigationRailDestination destination;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final foreground = selected
+        ? theme.colorScheme.onSecondaryContainer
+        : theme.colorScheme.onSurfaceVariant;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+      decoration: BoxDecoration(
+        color: selected
+            ? theme.colorScheme.secondaryContainer
+            : Colors.transparent,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconTheme.merge(
+            data: IconThemeData(color: foreground),
+            child: selected
+                ? (destination.selectedIcon ?? destination.icon)
+                : destination.icon,
+          ),
+          DefaultTextStyle.merge(
+            textAlign: TextAlign.center,
+            style: (theme.textTheme.labelMedium ?? const TextStyle()).copyWith(
+              color: foreground,
+            ),
+            child: destination.label,
+          ),
+        ],
+      ),
+    );
   }
 }
 
