@@ -115,6 +115,9 @@ void main(List<String> args) async {
           );
         }
       }
+      // Detect Android TV once, before the UI builds, so form-factor branches
+      // can read `isTv`. No-op on other platforms. See #729.
+      await initIsTv();
       final storage = StorageProvider();
       // Don't force the Android "all files access" (MANAGE_EXTERNAL_STORAGE)
       // prompt at launch. The database lives in scoped app storage, so the app
