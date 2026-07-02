@@ -4,6 +4,11 @@ name: TV Test Build
 # uploads it as a downloadable artifact, so the merged PRs can be sideloaded
 # and tested on an Android TV without a local Flutter/Xcode toolchain.
 # Debug build needs no signing secrets, so it runs on a fork.
+#
+# Speed: the first run is slow because every cache is cold. It then caches the
+# Rust bridge tool, the compiled Rust crate (rust-cache) and the Gradle deps, so
+# later runs only recompile what changed. Builds arm64-v8a only (physical
+# Android TVs are arm64) — one ABI instead of three, ~half the native work.
 on:
   push:
     branches: [tv-test-build]
@@ -15,7 +20,7 @@ concurrency:
 
 jobs:
   build-apk:
-    name: Build debug APK
+    name: Build debug APK (arm64)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -35,6 +40,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+        env:
+          JAVA_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=512m"
+
+      - name: Setup Gradle properties for CI
+        run: |
+          echo "org.gradle.jvmargs=-Xmx4096M -XX:MaxMetaspaceSize=512m -XX:+UseG1GC" >> android/gradle.properties
+          echo "org.gradle.parallel=true" >> android/gradle.properties
+          echo "org.gradle.daemon=false" >> android/gradle.properties
 
       - name: Setup cmake
         uses: jwlawson/actions-setup-cmake@v2
@@ -44,14 +57,47 @@ jobs:
       - name: Setup ninja
         uses: seanmiddleditch/gha-setup-ninja@master
 
+      # Cache the compiled Rust crate (rust/) so the native bridge isn't rebuilt
+      # from scratch every run — the single biggest repeat-build speedup.
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      # Cache the frb codegen binary so `cargo install` (a multi-minute compile)
+      # only runs on the first build, not every time.
+      - name: Cache flutter_rust_bridge_codegen
+        id: cache-frb
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/flutter_rust_bridge_codegen
+          key: frb-codegen-${{ runner.os }}-v1
+
       - name: Install flutter_rust_bridge_codegen
-        run: cargo install 'flutter_rust_bridge_codegen'
+        if: steps.cache-frb.outputs.cache-hit != 'true'
+        run: cargo install flutter_rust_bridge_codegen
+
+      # Cache Gradle caches + wrapper so Android dependency resolution and the
+      # build don't re-download / recompute everything each run.
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build debug APK
-        run: flutter build apk --debug
+      # arm64-v8a only: physical Android TVs are arm64, so skipping armv7 + x86_64
+      # cuts the native Rust + Gradle work roughly in half vs a fat APK.
+      - name: Build debug APK (arm64-v8a)
+        run: |
+          export GRADLE_OPTS="-Xmx4096m -XX:MaxMetaspaceSize=512m -XX:+UseG1GC"
+          flutter build apk --debug --target-platform android-arm64
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
