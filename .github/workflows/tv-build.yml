@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   build-apk:
-    name: Build debug APK (armeabi-v7a)
+    name: Build debug APK (all ABIs)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -92,13 +92,14 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # armeabi-v7a only: the target Fire TV runs a 32-bit Android runtime (it
-      # loads armeabi-v7a, not arm64-v8a), so build that one ABI. Skipping the
-      # other ABIs keeps the native Rust + Gradle work down vs a fat APK.
-      - name: Build debug APK (armeabi-v7a)
+      # Fat APK (all ABIs: armeabi-v7a + arm64-v8a + x86_64). One file that
+      # installs on the armv7 Fire TV, an x86_64 Android TV emulator, and arm64
+      # devices — so no more per-device ABI juggling. Slower (Rust compiles for
+      # each target) but reliable.
+      - name: Build debug APK (all ABIs)
         run: |
           export GRADLE_OPTS="-Xmx4096m -XX:MaxMetaspaceSize=512m -XX:+UseG1GC"
-          flutter build apk --debug --target-platform android-arm
+          flutter build apk --debug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
