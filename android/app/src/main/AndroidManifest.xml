@@ -25,6 +25,7 @@
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
+            android:banner="@drawable/tv_banner"
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/LaunchTheme"
