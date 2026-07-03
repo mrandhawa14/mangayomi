@@ -6,7 +6,6 @@ import 'package:mangayomi/modules/more/widgets/downloaded_only_widget.dart';
 import 'package:mangayomi/modules/more/widgets/incognito_mode_widget.dart';
 import 'package:mangayomi/modules/more/widgets/list_tile_widget.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
-import 'package:mangayomi/utils/platform_utils.dart';
 
 class MoreScreen extends ConsumerStatefulWidget {
   const MoreScreen({super.key});
@@ -28,16 +27,10 @@ class MoreScreenState extends ConsumerState<MoreScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 40),
               child: Image.asset(
-                // TV shows a dedicated (full-colour) icon; phones/desktop keep
-                // the theme-tinted default. See isTv.
-                isTv
-                    ? "assets/app_icons/icon_red_tv_2.png"
-                    : "assets/app_icons/icon.png",
-                color: isTv
-                    ? null
-                    : (Theme.of(context).brightness == Brightness.light
-                          ? Colors.black
-                          : Colors.white),
+                "assets/app_icons/icon.png",
+                color: Theme.of(context).brightness == Brightness.light
+                    ? Colors.black
+                    : Colors.white,
                 fit: BoxFit.cover,
                 height: 100,
               ),
