@@ -13,7 +13,7 @@ class LoadingIcon extends StatelessWidget {
           // TV shows a dedicated (full-colour) icon; phones/desktop keep the
           // tinted default. See isTv.
           isTv
-              ? "assets/app_icons/icon_red_tv.png"
+              ? "assets/app_icons/icon_red_tv_2.png"
               : "assets/app_icons/icon.png",
           color: isTv ? null : Colors.black,
           fit: BoxFit.cover,

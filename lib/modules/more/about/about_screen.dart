@@ -43,7 +43,7 @@ class AboutScreen extends ConsumerWidget {
                       // TV shows a dedicated (full-colour) icon; phones/desktop
                       // keep the theme-tinted default. See isTv.
                       isTv
-                          ? "assets/app_icons/icon_red_tv_3.png"
+                          ? "assets/app_icons/icon_red_tv_2.png"
                           : "assets/app_icons/icon.png",
                       color: isTv
                           ? null
