@@ -8,6 +8,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/modules/more/about/providers/check_for_update.dart';
 import 'package:mangayomi/modules/more/about/providers/download_file_screen.dart';
 import 'package:mangayomi/modules/more/about/providers/get_package_info.dart';
@@ -39,10 +40,16 @@ class AboutScreen extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 40),
                     child: Image.asset(
-                      "assets/app_icons/icon.png",
-                      color: Theme.of(context).brightness == Brightness.light
-                          ? Colors.black
-                          : Colors.white,
+                      // TV shows a dedicated (full-colour) icon; phones/desktop
+                      // keep the theme-tinted default. See isTv.
+                      isTv
+                          ? "assets/app_icons/icon_red_tv_3.png"
+                          : "assets/app_icons/icon.png",
+                      color: isTv
+                          ? null
+                          : (Theme.of(context).brightness == Brightness.light
+                                ? Colors.black
+                                : Colors.white),
                       fit: BoxFit.cover,
                       height: 100,
                     ),
