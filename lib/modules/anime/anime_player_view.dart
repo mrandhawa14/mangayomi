@@ -2093,6 +2093,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   defaultSkipIntroLength: skipIntroLength,
                   desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
                   chapterMarks: _chapterMarks,
+                  revealControls: _revealControls,
                 )
               : MobileControllerWidget(
                   videoController: _controller,
