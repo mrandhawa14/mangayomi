@@ -502,48 +502,72 @@ class _AutoplayToggleState extends State<_AutoplayToggle> {
                 ? Border.all(color: widget.accent, width: 2)
                 : null,
           ),
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 150),
-            // Dim when off so the same icon reads on/off.
-            opacity: widget.on ? 1.0 : 0.4,
-            // Custom icon: drop assets/autoplay.png. Falls back to a drawn
-            // switch until the asset is present.
-            child: Image.asset(
-              'assets/autoplay.png',
-              height: 28,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stack) => _fallbackSwitch(),
-            ),
-          ),
+          child: _AutoplaySwitch(on: widget.on, accent: widget.accent),
         ),
       ),
     );
   }
 
-  Widget _fallbackSwitch() {
+}
+
+/// A drawn play/pause autoplay toggle (no asset): a pill track with a circular
+/// black knob that slides right + shows ▶ when on, left + shows ⏸ when off —
+/// matching the reference toggle style.
+class _AutoplaySwitch extends StatelessWidget {
+  const _AutoplaySwitch({required this.on, required this.accent});
+
+  final bool on;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    const w = 52.0;
+    const h = 28.0;
+    const trackH = 22.0;
+    const knob = 28.0;
     return SizedBox(
-      width: 34,
-      height: 18,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(9),
-          color: widget.on
-              ? widget.accent
-              : Colors.white.withValues(alpha: 0.25),
-        ),
-        child: AnimatedAlign(
-          duration: const Duration(milliseconds: 160),
-          alignment: widget.on ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            width: 14,
-            height: 14,
-            margin: const EdgeInsets.all(2),
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
+      width: w,
+      height: h,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: w - 4,
+            height: trackH,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(trackH / 2),
+              color: on
+                  ? accent.withValues(alpha: 0.5)
+                  : Colors.white.withValues(alpha: 0.22),
             ),
           ),
-        ),
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: knob,
+              height: knob,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.black,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.4),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Icon(
+                on ? Icons.play_arrow : Icons.pause,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
