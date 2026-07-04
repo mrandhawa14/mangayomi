@@ -1859,7 +1859,8 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
             controller: _controller,
             desktopFullScreenPlayer: widget.desktopFullScreenPlayer,
           )
-        else
+        // A TV is always fullscreen, so the toggle is useless there — hide it.
+        else if (!isTv)
           IconButton(
             icon: Icon(isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen),
             iconSize: 25,

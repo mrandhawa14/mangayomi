@@ -53,6 +53,9 @@ class _MobileControllerWidgetState
   final FocusScopeNode _controlsScope = FocusScopeNode(
     debugLabel: 'playerControls',
   );
+  // The center play/pause — focused first on reveal so the d-pad lands on the
+  // main control rather than the top-bar back button.
+  final FocusNode _playPauseFocus = FocusNode(debugLabel: 'playerPlayPause');
   Duration controlsTransitionDuration = const Duration(milliseconds: 300);
   Color backdropColor = const Color(0x66000000);
   Timer? _timer;
@@ -151,7 +154,13 @@ class _MobileControllerWidgetState
     // Once focus is inside, subsequent keys navigate the buttons freely.
     if (!_controlsScope.hasFocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _controlsScope.requestFocus();
+        if (!mounted) return;
+        // Prefer the center play/pause; fall back to the scope's first button.
+        if (_playPauseFocus.canRequestFocus) {
+          _playPauseFocus.requestFocus();
+        } else {
+          _controlsScope.requestFocus();
+        }
       });
     }
   }
@@ -160,6 +169,7 @@ class _MobileControllerWidgetState
   void dispose() {
     widget.revealControls.removeListener(_onRevealRequest);
     _controlsScope.dispose();
+    _playPauseFocus.dispose();
     for (final subscription in subscriptions) {
       subscription.cancel();
     }
@@ -482,6 +492,7 @@ class _MobileControllerWidgetState
                                       widget.videoStatekey,
                                       widget.streamController,
                                       widget.videoController,
+                                      playPauseFocus: _playPauseFocus,
                                     ),
                                   ),
                                 ),
@@ -937,8 +948,9 @@ List<Widget> mobilePrimaryButtonBar(
   BuildContext context,
   GlobalKey<VideoState> key,
   AnimeStreamController streamController,
-  VideoController controller,
-) {
+  VideoController controller, {
+  FocusNode? playPauseFocus,
+}) {
   bool hasPrevEpisode =
       streamController.getEpisodeIndex().$1 + 1 !=
       streamController.getEpisodesLength(streamController.getEpisodeIndex().$2);
@@ -965,7 +977,7 @@ List<Widget> mobilePrimaryButtonBar(
       ),
     ),
     const Spacer(),
-    CustomPlayOrPauseButton(controller: controller),
+    CustomPlayOrPauseButton(controller: controller, focusNode: playPauseFocus),
     const Spacer(),
     IconButton(
       onPressed: hasNextEpisode
