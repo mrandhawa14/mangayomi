@@ -9,7 +9,6 @@ import 'package:mangayomi/modules/more/settings/reader/providers/reader_state_pr
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/modules/browse/extension/extension_screen.dart';
-import 'package:mangayomi/modules/browse/feed/feed_screen.dart';
 import 'package:mangayomi/modules/browse/sources/sources_screen.dart';
 import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/library/widgets/search_text_form_field.dart';
@@ -122,21 +121,9 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
                   )
                 : Row(
                     children: [
-                      if (!isExtensionTab)
-                        IconButton(
-                          splashRadius: 20,
-                          tooltip: 'Feed',
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const FeedScreen(),
-                            ),
-                          ),
-                          icon: Icon(
-                            Icons.rss_feed,
-                            color: Theme.of(context).hintColor,
-                          ),
-                        ),
+                      // Feed entry point temporarily disabled in this build —
+                      // it crashes on first load and its focus needs work (#782).
+                      // The FeedScreen code is kept for when we resume it.
                       if (isExtensionTab)
                         IconButton(
                           onPressed: () {
