@@ -34,39 +34,41 @@ class BrowseTab {
 class _BrowseScreenState extends ConsumerState<BrowseScreen>
     with TickerProviderStateMixin {
   late final hideItems = ref.read(hideItemsStateProvider);
-  // On the anime-only TV layout, hide manga & novel from Browse too (both
-  // sources and extensions) so only anime shows — matching the anime-only
-  // library. Defaults to isTv, user-overridable via the same provider. See #729.
-  late final _animeOnly = ref.read(animeOnlyTvModeProvider);
   final _textEditingController = TextEditingController();
   late TabController _tabBarController;
+  late List<BrowseTab> _tabList;
 
-  late final List<BrowseTab> _tabList = [
-    if (!_animeOnly && !hideItems.contains("/MangaLibrary"))
+  // Hide manga & novel from Browse (sources + extensions) on the anime-only TV
+  // layout so only anime shows. Recomputed live so toggling "Anime only" updates
+  // the tabs without a restart. Defaults to isTv, user-overridable. See #729.
+  List<BrowseTab> _computeTabList(bool animeOnly) => [
+    if (!animeOnly && !hideItems.contains("/MangaLibrary"))
       BrowseTab(ItemType.manga, BrowseTabKind.sources),
     if (!hideItems.contains("/AnimeLibrary"))
       BrowseTab(ItemType.anime, BrowseTabKind.sources),
-    if (!_animeOnly && !hideItems.contains("/NovelLibrary"))
+    if (!animeOnly && !hideItems.contains("/NovelLibrary"))
       BrowseTab(ItemType.novel, BrowseTabKind.sources),
-
-    if (!_animeOnly && !hideItems.contains("/MangaLibrary"))
+    if (!animeOnly && !hideItems.contains("/MangaLibrary"))
       BrowseTab(ItemType.manga, BrowseTabKind.extensions),
     if (!hideItems.contains("/AnimeLibrary"))
       BrowseTab(ItemType.anime, BrowseTabKind.extensions),
-    if (!_animeOnly && !hideItems.contains("/NovelLibrary"))
+    if (!animeOnly && !hideItems.contains("/NovelLibrary"))
       BrowseTab(ItemType.novel, BrowseTabKind.extensions),
   ];
 
   @override
   void initState() {
     super.initState();
+    _tabList = _computeTabList(ref.read(animeOnlyTvModeProvider));
     _tabBarController = TabController(length: _tabList.length, vsync: this);
-    _tabBarController.addListener(() {
-      _chekPermission();
-      setState(() {
-        _textEditingController.clear();
-        _isSearch = false;
-      });
+    _tabBarController.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    _chekPermission();
+    setState(() {
+      _textEditingController.clear();
+      _isSearch = false;
     });
   }
 
@@ -84,6 +86,18 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   bool _isSearch = false;
   @override
   Widget build(BuildContext context) {
+    // Recompute the tab list live when "Anime only" flips; recreate the
+    // controller when the tab count changes.
+    final newTabs = _computeTabList(ref.watch(animeOnlyTvModeProvider));
+    if (newTabs.length != _tabList.length) {
+      _tabList = newTabs;
+      _tabBarController.removeListener(_onTabChanged);
+      _tabBarController.dispose();
+      _tabBarController = TabController(length: _tabList.length, vsync: this);
+      _tabBarController.addListener(_onTabChanged);
+    } else {
+      _tabList = newTabs;
+    }
     if (_tabList.isEmpty) {
       return SizedBox.shrink();
     }

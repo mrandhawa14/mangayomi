@@ -1585,9 +1585,36 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       onBack: () => Navigator.maybePop(context),
       onRestart: () => _player.seek(Duration.zero),
       onSettings: () => _videoSettingDraggableMenu(context),
-      onAudio: () => _videoSettingDraggableMenu(context),
-      onSubtitle: () => _videoSettingDraggableMenu(context),
+      qualityListenable: _video,
+      buildQualityOptions: _buildTvQualityOptions,
     );
+  }
+
+  // The source video list is the real dub/sub control (entries like "1080p Sub"
+  // / "1080p Dub"); switching re-opens the stream at that source. Mirrors
+  // _videoQualityWidget's selection logic for the TV pill bar.
+  List<TvTrackOption> _buildTvQualityOptions() {
+    if (widget.isLocal || widget.videos.isEmpty) return const <TvTrackOption>[];
+    final currentTitle = _video.value?.videoTrack?.title;
+    return [
+      for (final video in widget.videos)
+        TvTrackOption(
+          label: video.quality,
+          selected: currentTitle == video.quality,
+          onSelect: () {
+            if (_video.value?.videoTrack?.title == video.quality) return;
+            final prefs = VideoPrefs(
+              videoTrack: VideoTrack(video.url, video.quality, video.quality),
+              headers: video.headers,
+              isLocal: false,
+            );
+            _video.value = prefs;
+            _player.stop();
+            _openMedia(prefs);
+            _initSubtitleAndAudio = true;
+          },
+        ),
+    ];
   }
 
   Widget _mobileBottomButtonBar(BuildContext context) {

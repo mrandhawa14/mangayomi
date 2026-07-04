@@ -28,8 +28,8 @@ class TvPlayerControls extends StatefulWidget {
     required this.onBack,
     required this.onRestart,
     required this.onSettings,
-    required this.onAudio,
-    required this.onSubtitle,
+    required this.qualityListenable,
+    required this.buildQualityOptions,
   });
 
   final Player player;
@@ -43,8 +43,10 @@ class TvPlayerControls extends StatefulWidget {
   final VoidCallback onBack;
   final VoidCallback onRestart;
   final VoidCallback onSettings;
-  final VoidCallback onAudio;
-  final VoidCallback onSubtitle;
+  // Quality = the source video list (e.g. "1080p Sub"/"1080p Dub") — the real
+  // dub/sub control here. Rebuilt when [qualityListenable] fires.
+  final Listenable qualityListenable;
+  final List<TvTrackOption> Function() buildQualityOptions;
 
   @override
   State<TvPlayerControls> createState() => _TvPlayerControlsState();
@@ -151,19 +153,16 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                       child: const Icon(Icons.settings, color: Colors.white),
                     ),
                     const SizedBox(width: 8),
-                    // Autoplay-next toggle (dims when off).
+                    // Autoplay-next — YouTube-style labelled switch.
                     Consumer(
                       builder: (context, ref, _) {
                         final on = ref.watch(autoPlayNextEpisodeProvider);
-                        return _TvFocusable(
+                        return _AutoplayToggle(
                           accent: accent,
-                          onPressed: () => ref
+                          on: on,
+                          onToggle: () => ref
                               .read(autoPlayNextEpisodeProvider.notifier)
                               .toggle(),
-                          child: Icon(
-                            Icons.playlist_play,
-                            color: on ? Colors.white : Colors.white38,
-                          ),
                         );
                       },
                     ),
@@ -252,8 +251,13 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    // Inline audio + subtitle track pills (current one selected).
-                    _TrackPills(player: widget.player, accent: accent),
+                    // Quality | Subtitles | Audio pills (current one checked).
+                    _PillBar(
+                      player: widget.player,
+                      accent: accent,
+                      qualityListenable: widget.qualityListenable,
+                      buildQualityOptions: widget.buildQualityOptions,
+                    ),
                   ],
                 ),
               ),
@@ -361,62 +365,232 @@ class _PlayPauseButton extends StatelessWidget {
   }
 }
 
-/// Inline audio + subtitle track pills, centered. The current track in each is
-/// highlighted; selecting a pill switches to it.
-class _TrackPills extends StatelessWidget {
-  const _TrackPills({required this.player, required this.accent});
+/// A selectable option for the Quality group (source-provided video list).
+class TvTrackOption {
+  const TvTrackOption({
+    required this.label,
+    required this.selected,
+    required this.onSelect,
+  });
+  final String label;
+  final bool selected;
+  final VoidCallback onSelect;
+}
+
+/// The bottom pill bar: `Quality | Subtitles | Audio`, centered, current option
+/// in each group checked. Quality is the real dub/sub control here (it re-opens
+/// the stream at the chosen source video), so it comes first.
+class _PillBar extends StatelessWidget {
+  const _PillBar({
+    required this.player,
+    required this.accent,
+    required this.qualityListenable,
+    required this.buildQualityOptions,
+  });
 
   final Player player;
   final Color accent;
+  final Listenable qualityListenable;
+  final List<TvTrackOption> Function() buildQualityOptions;
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<Tracks>(
-      stream: player.stream.tracks,
-      initialData: player.state.tracks,
-      builder: (context, tracksSnap) {
-        final tracks = tracksSnap.data ?? player.state.tracks;
-        return StreamBuilder<Track>(
-          stream: player.stream.track,
-          initialData: player.state.track,
-          builder: (context, trackSnap) {
-            final current = trackSnap.data ?? player.state.track;
-            final audios = tracks.audio
-                .where((t) => t.id != 'auto' && t.id != 'no')
-                .toList();
-            final subs = tracks.subtitle
-                .where((t) => t.id != 'auto')
-                .toList();
-            final pills = <Widget>[
-              for (final a in audios)
-                _TrackPill(
-                  accent: accent,
-                  icon: Icons.audiotrack,
-                  label: _trackLabel(a.title, a.language, a.id),
-                  selected: a.id == current.audio.id,
-                  onTap: () => player.setAudioTrack(a),
-                ),
-              for (final s in subs)
-                _TrackPill(
-                  accent: accent,
-                  icon: Icons.subtitles_outlined,
-                  label: s.id == 'no'
-                      ? 'No subs'
-                      : _trackLabel(s.title, s.language, s.id),
-                  selected: s.id == current.subtitle.id,
-                  onTap: () => player.setSubtitleTrack(s),
-                ),
-            ];
-            if (pills.isEmpty) return const SizedBox.shrink();
-            return Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 8,
-              runSpacing: 8,
-              children: pills,
+    return AnimatedBuilder(
+      animation: qualityListenable,
+      builder: (context, _) {
+        final quality = buildQualityOptions();
+        return StreamBuilder<Tracks>(
+          stream: player.stream.tracks,
+          initialData: player.state.tracks,
+          builder: (context, tracksSnap) {
+            final tracks = tracksSnap.data ?? player.state.tracks;
+            return StreamBuilder<Track>(
+              stream: player.stream.track,
+              initialData: player.state.track,
+              builder: (context, trackSnap) {
+                final current = trackSnap.data ?? player.state.track;
+                final subs = tracks.subtitle
+                    .where((t) => t.id != 'auto')
+                    .toList();
+                final hasRealSubs = subs.any((t) => t.id != 'no');
+                final audios = tracks.audio
+                    .where((t) => t.id != 'auto' && t.id != 'no')
+                    .toList();
+
+                final groups = <List<Widget>>[];
+
+                // Quality group — the dub/sub control.
+                if (quality.isNotEmpty) {
+                  groups.add([
+                    for (final q in quality)
+                      _TrackPill(
+                        accent: accent,
+                        icon: Icons.high_quality_outlined,
+                        label: q.label,
+                        selected: q.selected,
+                        onTap: q.onSelect,
+                      ),
+                  ]);
+                }
+
+                // Subtitle group — real tracks if any, else one "No subtitles".
+                if (hasRealSubs) {
+                  groups.add([
+                    for (final s in subs)
+                      _TrackPill(
+                        accent: accent,
+                        icon: Icons.subtitles_outlined,
+                        label: s.id == 'no'
+                            ? 'Off'
+                            : _trackLabel(s.title, s.language, s.id),
+                        selected: s.id == current.subtitle.id,
+                        onTap: () => player.setSubtitleTrack(s),
+                      ),
+                  ]);
+                } else {
+                  groups.add([
+                    _TrackPill(
+                      accent: accent,
+                      icon: Icons.subtitles_off_outlined,
+                      label: 'No subtitles',
+                      selected: false,
+                      onTap: () {},
+                    ),
+                  ]);
+                }
+
+                // Audio group — usually minimal, but shown for completeness.
+                if (audios.isNotEmpty) {
+                  groups.add([
+                    for (final a in audios)
+                      _TrackPill(
+                        accent: accent,
+                        icon: Icons.audiotrack,
+                        label: _trackLabel(a.title, a.language, a.id),
+                        selected: a.id == current.audio.id,
+                        onTap: () => player.setAudioTrack(a),
+                      ),
+                  ]);
+                }
+
+                // Join groups with a "|" divider.
+                final children = <Widget>[];
+                for (var i = 0; i < groups.length; i++) {
+                  if (i > 0) children.add(const _PillDivider());
+                  children.addAll(groups[i]);
+                }
+                if (children.isEmpty) return const SizedBox.shrink();
+                return Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: children,
+                );
+              },
             );
           },
         );
       },
+    );
+  }
+}
+
+/// A thin vertical "|" separator between pill groups.
+class _PillDivider extends StatelessWidget {
+  const _PillDivider();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 22,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      color: Colors.white.withValues(alpha: 0.3),
+    );
+  }
+}
+
+/// A compact YouTube-style "Autoplay" labelled switch, focusable for the d-pad.
+class _AutoplayToggle extends StatefulWidget {
+  const _AutoplayToggle({
+    required this.accent,
+    required this.on,
+    required this.onToggle,
+  });
+
+  final Color accent;
+  final bool on;
+  final VoidCallback onToggle;
+
+  @override
+  State<_AutoplayToggle> createState() => _AutoplayToggleState();
+}
+
+class _AutoplayToggleState extends State<_AutoplayToggle> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onFocusChange: (f) => setState(() => _focused = f),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && _isSelect(event.logicalKey)) {
+          widget.onToggle();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onToggle,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: Colors.black.withValues(alpha: 0.35),
+            border: _focused
+                ? Border.all(color: widget.accent, width: 2)
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Autoplay',
+                style: TextStyle(color: Colors.white, fontSize: 13),
+              ),
+              const SizedBox(width: 8),
+              // Mini switch: grey track off, accent on, white knob slides.
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 34,
+                height: 18,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(9),
+                  color: widget.on
+                      ? widget.accent
+                      : Colors.white.withValues(alpha: 0.25),
+                ),
+                child: AnimatedAlign(
+                  duration: const Duration(milliseconds: 160),
+                  alignment: widget.on
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: Container(
+                    width: 14,
+                    height: 14,
+                    margin: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
