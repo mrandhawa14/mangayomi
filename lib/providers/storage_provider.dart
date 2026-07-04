@@ -382,36 +382,7 @@ end""",
       });
     }
 
-    _seedDefaultAnimeRepos(isar);
     return isar;
-  }
-
-  // Ships two anime extension repos as defaults so a fresh install (or
-  // reinstall) already has them and the user doesn't re-add them each time.
-  // Runs on every startup and adds only the URLs that are missing, so the two
-  // are effectively always available.
-  void _seedDefaultAnimeRepos(Isar isar) {
-    const urls = [
-      'https://raw.githubusercontent.com/Swakshan/mangayomi-swak-extensions/refs/heads/main/anime_index.json',
-      'https://raw.githubusercontent.com/Mallyd11/mangayomi-anime-extensions/main/anime_index.json',
-    ];
-    try {
-      final settings = isar.settings.getSync(227);
-      if (settings == null) return;
-      final repos = [...(settings.animeExtensionsRepo ?? <Repo>[])];
-      var changed = false;
-      for (final url in urls) {
-        if (!repos.any((r) => r.jsonUrl == url)) {
-          repos.add(Repo(jsonUrl: url));
-          changed = true;
-        }
-      }
-      if (changed) {
-        isar.writeTxnSync(
-          () => isar.settings.putSync(settings..animeExtensionsRepo = repos),
-        );
-      }
-    } catch (_) {}
   }
 
   Future<Isar> _openIsar(Directory dir, bool inspector) {
