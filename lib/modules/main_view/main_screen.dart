@@ -679,9 +679,6 @@ class _TabletLayoutState extends State<_TabletLayout> {
     debugLabel: 'navContentScope',
   );
   bool _didAutofocusRail = false;
-  // Remembers where focus was in the content when the user crossed to the rail,
-  // so RIGHT returns them to the exact same spot.
-  FocusNode? _lastContentFocus;
 
   @override
   void dispose() {
@@ -690,11 +687,10 @@ class _TabletLayoutState extends State<_TabletLayout> {
     super.dispose();
   }
 
-  // TV d-pad crossing: a single LEFT pulls focus straight onto the rail (no need
-  // to walk the whole content grid to reach its edge first); RIGHT from the rail
-  // returns to exactly where the user left the content. Other keys (up/down/
-  // select) fall through to the default handler. Only active while the rail is
-  // visible (library tabs), never in the reader.
+  // TV d-pad crossing: LEFT that can't move any further inside the content
+  // pulls focus onto the rail; RIGHT from the rail dives into the content.
+  // Other keys (up/down/select) fall through to the default handler. Only
+  // active while the rail is visible (library tabs), never in the reader.
   KeyEventResult _handleTvKey(KeyEvent event, bool railVisible) {
     if (!railVisible) return KeyEventResult.ignored;
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
@@ -703,17 +699,13 @@ class _TabletLayoutState extends State<_TabletLayout> {
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (_railScope.hasFocus) return KeyEventResult.ignored;
-      _lastContentFocus = FocusManager.instance.primaryFocus;
-      _railScope.requestFocus();
+      final current = FocusManager.instance.primaryFocus;
+      final moved = current?.focusInDirection(TraversalDirection.left) ?? false;
+      if (!moved) _railScope.requestFocus();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight && _railScope.hasFocus) {
-      final last = _lastContentFocus;
-      if (last != null && last.context != null) {
-        last.requestFocus();
-      } else {
-        _contentScope.requestFocus();
-      }
+      _contentScope.requestFocus();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -729,7 +721,6 @@ class _TabletLayoutState extends State<_TabletLayout> {
     final railWidth = _getNavigationRailWidth(
       widget.isLongPressed,
       widget.location,
-      isTv,
     );
     final railVisible = railWidth > 0;
 
@@ -745,14 +736,6 @@ class _TabletLayoutState extends State<_TabletLayout> {
     Widget navRail = NavigationRail(
       labelType: NavigationRailLabelType.all,
       useIndicator: true,
-      // Scale the rail up on TV for couch-distance readability.
-      minWidth: isTv ? 96.0 : null,
-      selectedIconTheme: isTv ? const IconThemeData(size: 32) : null,
-      unselectedIconTheme: isTv ? const IconThemeData(size: 30) : null,
-      selectedLabelTextStyle: isTv
-          ? const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)
-          : null,
-      unselectedLabelTextStyle: isTv ? const TextStyle(fontSize: 13) : null,
       destinations: destinations,
       selectedIndex:
           (widget.currentIndex >= 0 &&
@@ -819,11 +802,7 @@ class _TabletLayoutState extends State<_TabletLayout> {
     return row;
   }
 
-  static double _getNavigationRailWidth(
-    bool isLongPressed,
-    String? location,
-    bool isTv,
-  ) {
+  static double _getNavigationRailWidth(bool isLongPressed, String? location) {
     if (isLongPressed) return 0;
 
     const validLocations = {
@@ -837,10 +816,7 @@ class _TabletLayoutState extends State<_TabletLayout> {
       '/trackerLibrary',
     };
 
-    final visible = location == null || validLocations.contains(location);
-    if (!visible) return 0;
-    // A wider rail on TV so the bigger icons + labels are readable from the couch.
-    return isTv ? 140 : 100;
+    return (location == null || validLocations.contains(location)) ? 100 : 0;
   }
 }
 
