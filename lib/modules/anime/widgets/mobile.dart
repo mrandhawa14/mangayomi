@@ -48,6 +48,11 @@ class _MobileControllerWidgetState
     extends ConsumerState<MobileControllerWidget> {
   bool mount = true;
   bool visible = true;
+  // Wraps the control buttons; requestFocus()'d on reveal so the d-pad lands on
+  // a real button (see _onRevealRequest).
+  final FocusScopeNode _controlsScope = FocusScopeNode(
+    debugLabel: 'playerControls',
+  );
   Duration controlsTransitionDuration = const Duration(milliseconds: 300);
   Color backdropColor = const Color(0x66000000);
   Timer? _timer;
@@ -139,11 +144,22 @@ class _MobileControllerWidgetState
       });
     }
     _restartHideTimer();
+    // Move focus onto the controls only when it isn't already there. A
+    // FocusScope delegates requestFocus to its first focusable descendant, so
+    // this reliably lands the d-pad on a real button — unlike directional
+    // traversal from the full-screen player Focus, which never landed anywhere.
+    // Once focus is inside, subsequent keys navigate the buttons freely.
+    if (!_controlsScope.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _controlsScope.requestFocus();
+      });
+    }
   }
 
   @override
   void dispose() {
     widget.revealControls.removeListener(_onRevealRequest);
+    _controlsScope.dispose();
     for (final subscription in subscriptions) {
       subscription.cancel();
     }
@@ -191,42 +207,6 @@ class _MobileControllerWidgetState
     }
   }
 
-  // The touch path reveals the controls with a pointer tap, which a TV remote /
-  // keyboard can't produce. So on a directional/select key: if the controls are
-  // hidden, reveal them and move focus onto the buttons; if they're already up,
-  // keep them on-screen and let normal directional focus traversal move between
-  // the (already focusable) buttons. Only key events reach this — touch never
-  // sends them — so the touch UX is unchanged.
-  KeyEventResult _handleControlsKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-      return KeyEventResult.ignored;
-    }
-    final key = event.logicalKey;
-    final isNav =
-        key == LogicalKeyboardKey.arrowUp ||
-        key == LogicalKeyboardKey.arrowDown ||
-        key == LogicalKeyboardKey.arrowLeft ||
-        key == LogicalKeyboardKey.arrowRight ||
-        key == LogicalKeyboardKey.select ||
-        key == LogicalKeyboardKey.enter ||
-        key == LogicalKeyboardKey.numpadEnter ||
-        key == LogicalKeyboardKey.gameButtonA;
-    if (!isNav) return KeyEventResult.ignored;
-
-    if (!visible) {
-      setState(() {
-        mount = true;
-        visible = true;
-      });
-      _restartHideTimer();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) node.nextFocus();
-      });
-      return KeyEventResult.handled;
-    }
-    _restartHideTimer();
-    return KeyEventResult.ignored;
-  }
 
   void _restartHideTimer() {
     _timer?.cancel();
@@ -376,9 +356,8 @@ class _MobileControllerWidgetState
                   ),
                 ),
         ),
-        Focus(
-          autofocus: true,
-          onKeyEvent: _handleControlsKey,
+        FocusScope(
+          node: _controlsScope,
           child: Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.center,
