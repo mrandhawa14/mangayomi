@@ -98,13 +98,13 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
     final accent = Theme.of(context).colorScheme.primary;
     return FocusScope(
       node: _scope,
-      child: IgnorePointer(
-        ignoring: !_visible,
-        child: AnimatedOpacity(
-          opacity: _visible ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 200),
-          child: Stack(
-            children: [
+      // Only build the controls (and their per-frame StreamBuilders) while
+      // visible. Otherwise the seek/time streams rebuild ~4x/sec during
+      // playback and jank the Fire TV — hidden means nothing to render.
+      child: !_visible
+          ? const SizedBox.expand()
+          : Stack(
+              children: [
               // Scrim so white controls read over any frame.
               Positioned.fill(
                 child: DecoratedBox(
@@ -185,11 +185,12 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                 bottom: 28,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Buttons on their own row so Up/Down cleanly moves focus
-                    // between them, the seek bar, and the track chips.
+                    // Centered play controls, on their own row so Up/Down moves
+                    // focus between them, the seek bar, and the track pills.
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         _TvFocusable(
                           accent: accent,
@@ -232,30 +233,13 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        _TvChip(
-                          accent: accent,
-                          icon: Icons.audiotrack,
-                          label: 'Audio',
-                          onPressed: widget.onAudio,
-                        ),
-                        const SizedBox(width: 12),
-                        _TvChip(
-                          accent: accent,
-                          icon: Icons.subtitles_outlined,
-                          label: 'Subtitles',
-                          onPressed: widget.onSubtitle,
-                        ),
-                      ],
-                    ),
+                    // Inline audio + subtitle track pills (current one selected).
+                    _TrackPills(player: widget.player, accent: accent),
                   ],
                 ),
               ),
             ],
           ),
-        ),
-      ),
     );
   }
 }
@@ -358,57 +342,135 @@ class _PlayPauseButton extends StatelessWidget {
   }
 }
 
-/// A pill chip (audio / subtitles), focus-highlighted.
-class _TvChip extends StatefulWidget {
-  const _TvChip({
+/// Inline audio + subtitle track pills, centered. The current track in each is
+/// highlighted; selecting a pill switches to it.
+class _TrackPills extends StatelessWidget {
+  const _TrackPills({required this.player, required this.accent});
+
+  final Player player;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Tracks>(
+      stream: player.stream.tracks,
+      initialData: player.state.tracks,
+      builder: (context, tracksSnap) {
+        final tracks = tracksSnap.data ?? player.state.tracks;
+        return StreamBuilder<Track>(
+          stream: player.stream.track,
+          initialData: player.state.track,
+          builder: (context, trackSnap) {
+            final current = trackSnap.data ?? player.state.track;
+            final audios = tracks.audio
+                .where((t) => t.id != 'auto' && t.id != 'no')
+                .toList();
+            final subs = tracks.subtitle
+                .where((t) => t.id != 'auto')
+                .toList();
+            final pills = <Widget>[
+              for (final a in audios)
+                _TrackPill(
+                  accent: accent,
+                  icon: Icons.audiotrack,
+                  label: _trackLabel(a.title, a.language, a.id),
+                  selected: a.id == current.audio.id,
+                  onTap: () => player.setAudioTrack(a),
+                ),
+              for (final s in subs)
+                _TrackPill(
+                  accent: accent,
+                  icon: Icons.subtitles_outlined,
+                  label: s.id == 'no'
+                      ? 'No subs'
+                      : _trackLabel(s.title, s.language, s.id),
+                  selected: s.id == current.subtitle.id,
+                  onTap: () => player.setSubtitleTrack(s),
+                ),
+            ];
+            if (pills.isEmpty) return const SizedBox.shrink();
+            return Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: pills,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+String _trackLabel(String? title, String? language, String id) {
+  final t = (title ?? '').trim();
+  if (t.isNotEmpty) return t;
+  final l = (language ?? '').trim();
+  if (l.isNotEmpty) return l;
+  return id;
+}
+
+/// A small focusable track pill: accent when focused, faded accent when it's the
+/// current track (with a check), else a translucent fill.
+class _TrackPill extends StatefulWidget {
+  const _TrackPill({
     required this.accent,
     required this.icon,
     required this.label,
-    required this.onPressed,
+    required this.selected,
+    required this.onTap,
   });
 
   final Color accent;
   final IconData icon;
   final String label;
-  final VoidCallback onPressed;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
-  State<_TvChip> createState() => _TvChipState();
+  State<_TrackPill> createState() => _TrackPillState();
 }
 
-class _TvChipState extends State<_TvChip> {
+class _TrackPillState extends State<_TrackPill> {
   bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
+    final bg = _focused
+        ? widget.accent
+        : widget.selected
+        ? widget.accent.withValues(alpha: 0.4)
+        : Colors.white.withValues(alpha: 0.15);
     return Focus(
       onFocusChange: (f) => setState(() => _focused = f),
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent && _isSelect(event.logicalKey)) {
-          widget.onPressed();
+          widget.onTap();
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
       },
       child: GestureDetector(
-        onTap: widget.onPressed,
+        onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: _focused
-                ? widget.accent
-                : Colors.white.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(16),
+            color: bg,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.icon, color: Colors.white, size: 18),
-              const SizedBox(width: 8),
+              Icon(
+                widget.selected ? Icons.check : widget.icon,
+                color: Colors.white,
+                size: 14,
+              ),
+              const SizedBox(width: 6),
               Text(
                 widget.label,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
+                style: const TextStyle(color: Colors.white, fontSize: 12),
               ),
             ],
           ),
