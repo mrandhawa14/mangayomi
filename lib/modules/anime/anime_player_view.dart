@@ -1571,8 +1571,8 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     return TvPlayerControls(
       player: _player,
       revealControls: _revealControls,
-      title: episode.manga.value?.name ?? '',
-      episodeLabel: episode.name ?? '',
+      title: widget.episode.manga.value?.name ?? '',
+      episodeLabel: widget.episode.name ?? '',
       hasPrev: _streamController.hasPreviousEpisode,
       hasNext: hasNextEpisode,
       onPrev: _streamController.hasPreviousEpisode
