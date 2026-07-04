@@ -24,6 +24,7 @@ import 'package:mangayomi/modules/anime/providers/anime_player_controller_provid
 import 'package:mangayomi/modules/anime/providers/auto_play_next_provider.dart';
 import 'package:mangayomi/modules/anime/widgets/aniskip_countdown_btn.dart';
 import 'package:mangayomi/modules/anime/widgets/tv_player_controls.dart';
+import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/anime/widgets/desktop.dart';
 import 'package:mangayomi/modules/anime/widgets/play_or_pause_button.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
@@ -2043,9 +2044,9 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           ),
           fit: fit,
           key: _key,
-          controls: (state) => isTv
+          controls: (state) => (isTv && ref.read(tvPlayerStyleProvider))
               ? _tvControls()
-              : isDesktop
+              : (isDesktop || isTv)
               ? DesktopControllerWidget(
                   videoController: _controller,
                   topButtonBarWidget: _topButtonBar(context),

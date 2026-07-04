@@ -40,6 +40,19 @@ class BrowseSScreen extends ConsumerWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
+            // The master "anime only" TV switch: turning it off removes all the
+            // TV-only gates (shows manga & novel again across the app).
+            if (isTv)
+              SwitchListTile(
+                secondary: const Icon(Icons.tv_outlined),
+                title: const Text('Anime only'),
+                subtitle: const Text(
+                  'Hide manga & novel across the app. Turn off to show everything.',
+                ),
+                value: animeOnly,
+                onChanged: (v) =>
+                    ref.read(animeOnlyTvModeProvider.notifier).set(v),
+              ),
             Padding(
               padding: const EdgeInsets.only(bottom: 30, top: 20),
               child: Column(

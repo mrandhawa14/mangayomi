@@ -382,7 +382,7 @@ class Settings {
     this.dateFormat = "M/d/y",
     this.relativeTimesTamps = 2,
     this.flexSchemeColorIndex = 2,
-    this.themeIsDark = false,
+    this.themeIsDark = true,
     this.followSystemTheme = false,
     this.incognitoMode = false,
     this.chapterPageUrlsList,
