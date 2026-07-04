@@ -705,7 +705,14 @@ class _TabletLayoutState extends State<_TabletLayout> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight && _railScope.hasFocus) {
-      _contentScope.requestFocus();
+      // Dive into the content that sits directly to the right of the focused
+      // rail item (the grid/list body), rather than the scope's first
+      // focusable — which is a top app-bar action and left the library grid
+      // unreachable. Fall back to the scope if nothing is to the right.
+      final current = FocusManager.instance.primaryFocus;
+      final moved =
+          current?.focusInDirection(TraversalDirection.right) ?? false;
+      if (!moved) _contentScope.requestFocus();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
