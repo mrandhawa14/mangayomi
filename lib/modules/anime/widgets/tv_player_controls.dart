@@ -21,10 +21,6 @@ class TvPlayerControls extends StatefulWidget {
     required this.revealControls,
     required this.title,
     required this.episodeLabel,
-    required this.hasPrev,
-    required this.hasNext,
-    required this.onPrev,
-    required this.onNext,
     required this.onBack,
     required this.onRestart,
     required this.onSettings,
@@ -36,10 +32,6 @@ class TvPlayerControls extends StatefulWidget {
   final ValueNotifier<int> revealControls;
   final String title;
   final String episodeLabel;
-  final bool hasPrev;
-  final bool hasNext;
-  final VoidCallback? onPrev;
-  final VoidCallback? onNext;
   final VoidCallback onBack;
   final VoidCallback onRestart;
   final VoidCallback onSettings;
@@ -205,39 +197,16 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Centered play controls, on their own row so Up/Down moves
-                    // focus between them, the seek bar, and the track pills.
+                    // Play/pause on the left of the seek line (Netflix-style);
+                    // prev/next-episode buttons removed.
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _TvFocusable(
-                          accent: accent,
-                          onPressed: widget.hasPrev ? widget.onPrev : null,
-                          child: const Icon(
-                            Icons.skip_previous,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
                         _PlayPauseButton(
                           player: widget.player,
                           accent: accent,
                           focusNode: _playFocus,
                         ),
-                        const SizedBox(width: 10),
-                        _TvFocusable(
-                          accent: accent,
-                          onPressed: widget.hasNext ? widget.onNext : null,
-                          child: const Icon(
-                            Icons.skip_next,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
+                        const SizedBox(width: 14),
                         _PositionText(player: widget.player),
                         const SizedBox(width: 12),
                         Expanded(
@@ -409,17 +378,19 @@ class _PillBar extends StatelessWidget {
               initialData: player.state.track,
               builder: (context, trackSnap) {
                 final current = trackSnap.data ?? player.state.track;
+                // Real subtitle tracks only (no "auto"/"no" placeholders).
                 final subs = tracks.subtitle
-                    .where((t) => t.id != 'auto')
-                    .toList();
-                final hasRealSubs = subs.any((t) => t.id != 'no');
-                final audios = tracks.audio
                     .where((t) => t.id != 'auto' && t.id != 'no')
                     .toList();
+                // A "sub" quality already bakes subtitles into the stream, so
+                // hide the subtitle group when one is selected.
+                final subQualitySelected = quality.any(
+                  (q) => q.selected && q.label.toLowerCase().contains('sub'),
+                );
 
                 final groups = <List<Widget>>[];
 
-                // Quality group — the dub/sub control.
+                // Quality group — the real dub/sub control.
                 if (quality.isNotEmpty) {
                   groups.add([
                     for (final q in quality)
@@ -433,42 +404,22 @@ class _PillBar extends StatelessWidget {
                   ]);
                 }
 
-                // Subtitle group — real tracks if any, else one "No subtitles".
-                if (hasRealSubs) {
+                // Subtitle group — real tracks only, toggleable (re-clicking the
+                // selected one turns subtitles off). No separate "off" pill, and
+                // hidden entirely for sub-quality streams.
+                if (!subQualitySelected && subs.isNotEmpty) {
                   groups.add([
                     for (final s in subs)
                       _TrackPill(
                         accent: accent,
                         icon: Icons.subtitles_outlined,
-                        label: s.id == 'no'
-                            ? 'Off'
-                            : _trackLabel(s.title, s.language, s.id),
+                        label: _trackLabel(s.title, s.language, s.id),
                         selected: s.id == current.subtitle.id,
-                        onTap: () => player.setSubtitleTrack(s),
-                      ),
-                  ]);
-                } else {
-                  groups.add([
-                    _TrackPill(
-                      accent: accent,
-                      icon: Icons.subtitles_off_outlined,
-                      label: 'No subtitles',
-                      selected: false,
-                      onTap: () {},
-                    ),
-                  ]);
-                }
-
-                // Audio group — usually minimal, but shown for completeness.
-                if (audios.isNotEmpty) {
-                  groups.add([
-                    for (final a in audios)
-                      _TrackPill(
-                        accent: accent,
-                        icon: Icons.audiotrack,
-                        label: _trackLabel(a.title, a.language, a.id),
-                        selected: a.id == current.audio.id,
-                        onTap: () => player.setAudioTrack(a),
+                        onTap: () => player.setSubtitleTrack(
+                          s.id == current.subtitle.id
+                              ? SubtitleTrack.no()
+                              : s,
+                        ),
                       ),
                   ]);
                 }
@@ -544,50 +495,53 @@ class _AutoplayToggleState extends State<_AutoplayToggle> {
         onTap: widget.onToggle,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            color: Colors.black.withValues(alpha: 0.35),
             border: _focused
                 ? Border.all(color: widget.accent, width: 2)
                 : null,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Autoplay',
-                style: TextStyle(color: Colors.white, fontSize: 13),
-              ),
-              const SizedBox(width: 8),
-              // Mini switch: grey track off, accent on, white knob slides.
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                width: 34,
-                height: 18,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(9),
-                  color: widget.on
-                      ? widget.accent
-                      : Colors.white.withValues(alpha: 0.25),
-                ),
-                child: AnimatedAlign(
-                  duration: const Duration(milliseconds: 160),
-                  alignment: widget.on
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    margin: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 150),
+            // Dim when off so the same icon reads on/off.
+            opacity: widget.on ? 1.0 : 0.4,
+            // Custom icon: drop assets/autoplay.png. Falls back to a drawn
+            // switch until the asset is present.
+            child: Image.asset(
+              'assets/autoplay.png',
+              height: 28,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stack) => _fallbackSwitch(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _fallbackSwitch() {
+    return SizedBox(
+      width: 34,
+      height: 18,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(9),
+          color: widget.on
+              ? widget.accent
+              : Colors.white.withValues(alpha: 0.25),
+        ),
+        child: AnimatedAlign(
+          duration: const Duration(milliseconds: 160),
+          alignment: widget.on ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            width: 14,
+            height: 14,
+            margin: const EdgeInsets.all(2),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+            ),
           ),
         ),
       ),

@@ -1574,14 +1574,6 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       revealControls: _revealControls,
       title: widget.episode.manga.value?.name ?? '',
       episodeLabel: widget.episode.name ?? '',
-      hasPrev: _streamController.hasPreviousEpisode,
-      hasNext: hasNextEpisode,
-      onPrev: _streamController.hasPreviousEpisode
-          ? () => pushToNewEpisode(context, _streamController.getPrevEpisode())
-          : null,
-      onNext: hasNextEpisode
-          ? () => pushToNewEpisode(context, _streamController.getNextEpisode())
-          : null,
       onBack: () => Navigator.maybePop(context),
       onRestart: () => _player.seek(Duration.zero),
       onSettings: () => _videoSettingDraggableMenu(context),
@@ -1599,7 +1591,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     return [
       for (final video in widget.videos)
         TvTrackOption(
-          label: video.quality,
+          label: _shortQuality(video.quality),
           selected: currentTitle == video.quality,
           onSelect: () {
             if (_video.value?.videoTrack?.title == video.quality) return;
@@ -1615,6 +1607,20 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           },
         ),
     ];
+  }
+
+  // Shorten a source quality label like "1080p (Sub)" to "1080-sub"/"1080-dub".
+  String _shortQuality(String raw) {
+    final lower = raw.toLowerCase();
+    final res = RegExp(r'(\d{3,4})\s*p?').firstMatch(lower)?.group(1);
+    final tag = lower.contains('sub')
+        ? 'sub'
+        : lower.contains('dub')
+        ? 'dub'
+        : null;
+    if (res != null && tag != null) return '$res-$tag';
+    if (res != null) return '${res}p';
+    return raw;
   }
 
   Widget _mobileBottomButtonBar(BuildContext context) {
