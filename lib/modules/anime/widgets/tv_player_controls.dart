@@ -48,7 +48,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
   bool _visible = true;
   Timer? _hideTimer;
   final FocusScopeNode _scope = FocusScopeNode(debugLabel: 'tvPlayer');
-  final FocusNode _seekFocus = FocusNode(debugLabel: 'tvPlayerSeek');
+  final FocusNode _playFocus = FocusNode(debugLabel: 'tvPlayerPlayPause');
   static const _hideAfter = Duration(seconds: 4);
 
   @override
@@ -57,7 +57,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
     widget.revealControls.addListener(_reveal);
     _startHideTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _seekFocus.requestFocus();
+      if (mounted) _playFocus.requestFocus();
     });
   }
 
@@ -66,7 +66,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
     widget.revealControls.removeListener(_reveal);
     _hideTimer?.cancel();
     _scope.dispose();
-    _seekFocus.dispose();
+    _playFocus.dispose();
     super.dispose();
   }
 
@@ -77,7 +77,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
     if (!_scope.hasFocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        (_seekFocus.canRequestFocus ? _seekFocus : _scope).requestFocus();
+        (_playFocus.canRequestFocus ? _playFocus : _scope).requestFocus();
       });
     }
   }
@@ -92,6 +92,12 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
   @override
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
+    // TV overscan-safe margins (~5% per side, Netflix-generous). Only the
+    // interactive controls/title are inset — the scrim stays full-bleed, per
+    // Android TV layout guidance.
+    final size = MediaQuery.of(context).size;
+    final safeH = size.width * 0.05;
+    final safeV = size.height * 0.05;
     return FocusScope(
       node: _scope,
       // Only build the controls (and their per-frame StreamBuilders) while
@@ -120,8 +126,8 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
               ),
               // Top-left: back / restart / gear.
               Positioned(
-                top: 28,
-                left: 28,
+                top: safeV,
+                left: safeH,
                 child: Row(
                   children: [
                     _TvFocusable(
@@ -163,8 +169,8 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
               ),
               // Top-right: title + episode.
               Positioned(
-                top: 28,
-                right: 28,
+                top: safeV,
+                right: safeH,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -190,28 +196,36 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
               ),
               // Bottom: controls + seek + tracks.
               Positioned(
-                left: 32,
-                right: 32,
-                bottom: 28,
+                left: safeH,
+                right: safeH,
+                bottom: safeV,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Play/pause on the left of the seek line (Netflix-style);
                     // prev/next-episode buttons removed.
+                    // Play/pause on its own row so it's d-pad-reachable (the
+                    // seek bar owns Left/Right for scrubbing). Default focus +
+                    // highlighted; OK on the seek bar also toggles it.
                     Row(
                       children: [
-                        // Non-focusable — OK/Select on the seek bar toggles it
-                        // (Netflix model); it just reflects the current state.
-                        _PlayPauseIndicator(player: widget.player),
-                        const SizedBox(width: 14),
+                        _PlayPauseButton(
+                          player: widget.player,
+                          accent: accent,
+                          focusNode: _playFocus,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
                         _PositionText(player: widget.player),
                         const SizedBox(width: 12),
                         Expanded(
                           child: _TvSeekBar(
                             player: widget.player,
                             accent: accent,
-                            focusNode: _seekFocus,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -299,12 +313,18 @@ class _TvFocusableState extends State<_TvFocusable> {
   }
 }
 
-/// Non-focusable play/pause indicator — reflects state; toggled by OK on the
-/// seek bar (Netflix model), so it isn't part of d-pad focus traversal.
-class _PlayPauseIndicator extends StatelessWidget {
-  const _PlayPauseIndicator({required this.player});
+/// Focusable play/pause button — highlighted when focused, and the default
+/// focus on reveal. OK on the seek bar also toggles it (Netflix convenience).
+class _PlayPauseButton extends StatelessWidget {
+  const _PlayPauseButton({
+    required this.player,
+    required this.accent,
+    required this.focusNode,
+  });
 
   final Player player;
+  final Color accent;
+  final FocusNode focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -313,8 +333,11 @@ class _PlayPauseIndicator extends StatelessWidget {
       initialData: player.state.playing,
       builder: (context, snapshot) {
         final playing = snapshot.data ?? false;
-        return Padding(
-          padding: const EdgeInsets.all(6),
+        return _TvFocusable(
+          accent: accent,
+          focusNode: focusNode,
+          autofocus: true,
+          onPressed: player.playOrPause,
           child: Icon(
             playing ? Icons.pause : Icons.play_arrow,
             color: Colors.white,
