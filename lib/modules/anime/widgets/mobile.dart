@@ -26,7 +26,7 @@ class MobileControllerWidget extends ConsumerStatefulWidget {
   final Widget bottomButtonBarWidget;
   final ValueNotifier<List<(String, int)>> chapterMarks;
   // Bumped by the player on each d-pad key so the controls reveal on a TV remote.
-  final ValueListenable<int> revealControls;
+  final ValueNotifier<int> revealControls;
   const MobileControllerWidget({
     super.key,
     required this.videoController,
