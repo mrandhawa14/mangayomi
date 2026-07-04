@@ -486,13 +486,23 @@ class _MobileControllerWidgetState
                                     : 1.0,
                                 duration: controlsTransitionDuration,
                                 child: Center(
-                                  child: Row(
-                                    children: mobilePrimaryButtonBar(
-                                      context,
-                                      widget.videoStatekey,
-                                      widget.streamController,
-                                      widget.videoController,
-                                      playPauseFocus: _playPauseFocus,
+                                  // Brighter focus highlight on the main controls
+                                  // so the focused button stands out against the
+                                  // dark backdrop on a TV.
+                                  child: Theme(
+                                    data: Theme.of(context).copyWith(
+                                      focusColor: Colors.white.withValues(
+                                        alpha: 0.45,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: mobilePrimaryButtonBar(
+                                        context,
+                                        widget.videoStatekey,
+                                        widget.streamController,
+                                        widget.videoController,
+                                        playPauseFocus: _playPauseFocus,
+                                      ),
                                     ),
                                   ),
                                 ),
