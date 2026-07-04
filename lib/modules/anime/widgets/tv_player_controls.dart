@@ -518,7 +518,7 @@ class _AutoplayToggleState extends State<_AutoplayToggle> {
                 ? widget.accent.withValues(alpha: 0.25)
                 : Colors.transparent,
           ),
-          child: _AutoplaySwitch(on: widget.on, accent: widget.accent),
+          child: AutoplaySwitch(on: widget.on, accent: widget.accent),
         ),
       ),
     );
@@ -529,8 +529,8 @@ class _AutoplayToggleState extends State<_AutoplayToggle> {
 /// A drawn play/pause autoplay toggle (no asset): a pill track with a circular
 /// black knob that slides right + shows ▶ when on, left + shows ⏸ when off —
 /// matching the reference toggle style.
-class _AutoplaySwitch extends StatelessWidget {
-  const _AutoplaySwitch({required this.on, required this.accent});
+class AutoplaySwitch extends StatelessWidget {
+  const AutoplaySwitch({required this.on, required this.accent});
 
   final bool on;
   final Color accent;

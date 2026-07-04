@@ -1991,17 +1991,28 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
               Consumer(
                 builder: (context, ref, _) {
                   final autoPlay = ref.watch(autoPlayNextEpisodeProvider);
-                  return IconButton(
-                    tooltip: autoPlay
+                  // Same drawn play/pause switch as the TV player, for a
+                  // consistent autoplay toggle across all players.
+                  return Tooltip(
+                    message: autoPlay
                         ? 'Autoplay next episode: on'
                         : 'Autoplay next episode: off',
-                    icon: Icon(
-                      Icons.playlist_play,
-                      color: autoPlay ? Colors.white : Colors.white38,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => ref
+                          .read(autoPlayNextEpisodeProvider.notifier)
+                          .toggle(),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
+                        child: AutoplaySwitch(
+                          on: autoPlay,
+                          accent: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
                     ),
-                    onPressed: () => ref
-                        .read(autoPlayNextEpisodeProvider.notifier)
-                        .toggle(),
                   );
                 },
               ),
