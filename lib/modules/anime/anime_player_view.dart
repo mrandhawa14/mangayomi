@@ -961,8 +961,13 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     });
   }
 
+  // Bumped on each d-pad key (see _onPlayerKey) so the mobile controls reveal
+  // themselves on a TV remote.
+  final ValueNotifier<int> _revealControls = ValueNotifier(0);
+
   @override
   void dispose() {
+    _revealControls.dispose();
     _watchStopwatch.stop();
     _currentPosition.removeListener(_updateRpcTimestamp);
     _subDelayController.removeListener(_onSubDelayChanged);
@@ -2041,6 +2046,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   videoStatekey: _key,
                   bottomButtonBarWidget: _mobileBottomButtonBar(context),
                   streamController: _streamController,
+                  revealControls: _revealControls,
                   doubleSpeed: (value) {
                     _isDoubleSpeed.value = value ?? false;
                   },
@@ -2376,8 +2382,30 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           }
         },
       },
-      child: Focus(autofocus: true, child: child),
+      child: Focus(autofocus: true, onKeyEvent: _onPlayerKey, child: child),
     );
+  }
+
+  // On a TV remote / keyboard, reveal the on-screen controls when the user
+  // presses the d-pad. The arrow keys stay unbound above (so they still drive
+  // focus traversal between the control buttons) — we just bump [_revealControls]
+  // so the controls become visible and the focus is on something the user can
+  // see. Returns ignored so traversal + the media shortcuts still run.
+  KeyEventResult _onPlayerKey(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent || event is KeyRepeatEvent) {
+      final k = event.logicalKey;
+      final isNav =
+          k == LogicalKeyboardKey.arrowUp ||
+          k == LogicalKeyboardKey.arrowDown ||
+          k == LogicalKeyboardKey.arrowLeft ||
+          k == LogicalKeyboardKey.arrowRight ||
+          k == LogicalKeyboardKey.select ||
+          k == LogicalKeyboardKey.enter ||
+          k == LogicalKeyboardKey.numpadEnter ||
+          k == LogicalKeyboardKey.gameButtonA;
+      if (isNav) _revealControls.value++;
+    }
+    return KeyEventResult.ignored;
   }
 }
 

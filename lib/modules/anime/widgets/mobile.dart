@@ -25,6 +25,8 @@ class MobileControllerWidget extends ConsumerStatefulWidget {
   final GlobalKey<VideoState> videoStatekey;
   final Widget bottomButtonBarWidget;
   final ValueNotifier<List<(String, int)>> chapterMarks;
+  // Bumped by the player on each d-pad key so the controls reveal on a TV remote.
+  final ValueListenable<int> revealControls;
   const MobileControllerWidget({
     super.key,
     required this.videoController,
@@ -34,6 +36,7 @@ class MobileControllerWidget extends ConsumerStatefulWidget {
     required this.videoStatekey,
     required this.doubleSpeed,
     required this.chapterMarks,
+    required this.revealControls,
   });
 
   @override
@@ -125,8 +128,22 @@ class _MobileControllerWidgetState
     }
   }
 
+  // Called by the player on each d-pad key: reveal the controls if hidden and
+  // keep them on-screen while the user navigates the buttons with the remote.
+  void _onRevealRequest() {
+    if (!mounted) return;
+    if (!visible) {
+      setState(() {
+        mount = true;
+        visible = true;
+      });
+    }
+    _restartHideTimer();
+  }
+
   @override
   void dispose() {
+    widget.revealControls.removeListener(_onRevealRequest);
     for (final subscription in subscriptions) {
       subscription.cancel();
     }
@@ -283,6 +300,7 @@ class _MobileControllerWidgetState
   @override
   void initState() {
     super.initState();
+    widget.revealControls.addListener(_onRevealRequest);
     _volumeController = VolumeController.instance;
 
     Future.microtask(() async {
