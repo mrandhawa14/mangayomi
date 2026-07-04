@@ -174,6 +174,55 @@ class _MobileControllerWidgetState
     }
   }
 
+  // The touch path reveals the controls with a pointer tap, which a TV remote /
+  // keyboard can't produce. So on a directional/select key: if the controls are
+  // hidden, reveal them and move focus onto the buttons; if they're already up,
+  // keep them on-screen and let normal directional focus traversal move between
+  // the (already focusable) buttons. Only key events reach this — touch never
+  // sends them — so the touch UX is unchanged.
+  KeyEventResult _handleControlsKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    final isNav =
+        key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown ||
+        key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight ||
+        key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.gameButtonA;
+    if (!isNav) return KeyEventResult.ignored;
+
+    if (!visible) {
+      setState(() {
+        mount = true;
+        visible = true;
+      });
+      _restartHideTimer();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) node.nextFocus();
+      });
+      return KeyEventResult.handled;
+    }
+    _restartHideTimer();
+    return KeyEventResult.ignored;
+  }
+
+  void _restartHideTimer() {
+    _timer?.cancel();
+    _timer = Timer(controlsHoverDuration, () {
+      if (mounted) {
+        setState(() {
+          visible = false;
+        });
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+      }
+    });
+  }
+
   void onDoubleTapSeekBackward() {
     setState(() {
       _mountSeekBackwardButton = true;
@@ -311,6 +360,7 @@ class _MobileControllerWidgetState
         ),
         Focus(
           autofocus: true,
+          onKeyEvent: _handleControlsKey,
           child: Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.center,
