@@ -13,6 +13,7 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/update.dart';
 import 'package:mangayomi/modules/more/settings/player/custom_button_screen.dart';
+import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/sync/providers/sync_providers.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
@@ -31,6 +32,8 @@ class BrowseSScreen extends ConsumerWidget {
       checkForExtensionsUpdateStateProvider,
     );
     final autoUpdateExtensions = ref.watch(autoUpdateExtensionsStateProvider);
+    // On the anime-only TV layout, hide the manga & novel repo settings.
+    final animeOnly = ref.watch(animeOnlyTvModeProvider);
     final l10n = l10nLocalizations(context);
     return Scaffold(
       appBar: AppBar(title: Text(l10n!.browse)),
@@ -72,14 +75,15 @@ class BrowseSScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  ListTile(
-                    onTap: () {
-                      context.push(
-                        "/SourceRepositories",
-                        extra: ItemType.manga,
-                      );
-                    },
-                    title: Text(l10n.manga_extensions_repo),
+                  if (!animeOnly)
+                    ListTile(
+                      onTap: () {
+                        context.push(
+                          "/SourceRepositories",
+                          extra: ItemType.manga,
+                        );
+                      },
+                      title: Text(l10n.manga_extensions_repo),
                     subtitle: Text(
                       l10n.manage_manga_repo_urls,
                       style: TextStyle(
@@ -104,14 +108,15 @@ class BrowseSScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  ListTile(
-                    onTap: () {
-                      context.push(
-                        "/SourceRepositories",
-                        extra: ItemType.novel,
-                      );
-                    },
-                    title: Text(l10n.novel_extensions_repo),
+                  if (!animeOnly)
+                    ListTile(
+                      onTap: () {
+                        context.push(
+                          "/SourceRepositories",
+                          extra: ItemType.novel,
+                        );
+                      },
+                      title: Text(l10n.novel_extensions_repo),
                     subtitle: Text(
                       l10n.manage_novel_repo_urls,
                       style: TextStyle(
