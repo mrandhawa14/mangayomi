@@ -23,6 +23,7 @@ import 'package:mangayomi/models/video.dart' as vid;
 import 'package:mangayomi/modules/anime/providers/anime_player_controller_provider.dart';
 import 'package:mangayomi/modules/anime/providers/auto_play_next_provider.dart';
 import 'package:mangayomi/modules/anime/widgets/aniskip_countdown_btn.dart';
+import 'package:mangayomi/modules/anime/widgets/tv_player_controls.dart';
 import 'package:mangayomi/modules/anime/widgets/desktop.dart';
 import 'package:mangayomi/modules/anime/widgets/play_or_pause_button.dart';
 import 'package:mangayomi/modules/library/providers/local_archive.dart';
@@ -1566,6 +1567,28 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
     );
   }
 
+  Widget _tvControls() {
+    return TvPlayerControls(
+      player: _player,
+      revealControls: _revealControls,
+      title: episode.manga.value?.name ?? '',
+      episodeLabel: episode.name ?? '',
+      hasPrev: _streamController.hasPreviousEpisode,
+      hasNext: hasNextEpisode,
+      onPrev: _streamController.hasPreviousEpisode
+          ? () => pushToNewEpisode(context, _streamController.getPrevEpisode())
+          : null,
+      onNext: hasNextEpisode
+          ? () => pushToNewEpisode(context, _streamController.getNextEpisode())
+          : null,
+      onBack: () => Navigator.maybePop(context),
+      onRestart: () => _player.seek(Duration.zero),
+      onSettings: () => _videoSettingDraggableMenu(context),
+      onAudio: () => _videoSettingDraggableMenu(context),
+      onSubtitle: () => _videoSettingDraggableMenu(context),
+    );
+  }
+
   Widget _mobileBottomButtonBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 30),
@@ -2020,7 +2043,9 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           ),
           fit: fit,
           key: _key,
-          controls: (state) => isDesktop
+          controls: (state) => isTv
+              ? _tvControls()
+              : isDesktop
               ? DesktopControllerWidget(
                   videoController: _controller,
                   topButtonBarWidget: _topButtonBar(context),
