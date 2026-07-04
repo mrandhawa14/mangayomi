@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mangayomi/modules/anime/providers/auto_play_next_provider.dart';
 import 'package:media_kit/media_kit.dart';
 
 /// A dedicated, Netflix-style controls overlay for the anime player on TV.
@@ -147,6 +149,23 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                       accent: accent,
                       onPressed: widget.onSettings,
                       child: const Icon(Icons.settings, color: Colors.white),
+                    ),
+                    const SizedBox(width: 8),
+                    // Autoplay-next toggle (dims when off).
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final on = ref.watch(autoPlayNextEpisodeProvider);
+                        return _TvFocusable(
+                          accent: accent,
+                          onPressed: () => ref
+                              .read(autoPlayNextEpisodeProvider.notifier)
+                              .toggle(),
+                          child: Icon(
+                            Icons.playlist_play,
+                            color: on ? Colors.white : Colors.white38,
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
