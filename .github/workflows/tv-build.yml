@@ -26,6 +26,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The fat all-ABIs debug build + Gradle/Rust/frb caches can exceed the
+      # runner's ~14 GB free disk. Reclaim ~15 GB of preinstalled tooling we
+      # don't use (dotnet, Haskell, boost, CodeQL, Docker images) — leaving the
+      # Android SDK/NDK, Java and Flutter intact.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost \
+                      /opt/hostedtoolcache/CodeQL /usr/local/graalvm \
+                      /usr/local/.ghcup || true
+          sudo docker image prune --all --force || true
+          df -h /
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
