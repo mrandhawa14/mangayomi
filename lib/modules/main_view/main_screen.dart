@@ -736,6 +736,31 @@ class _TabletLayoutState extends State<_TabletLayout> {
     Widget navRail = NavigationRail(
       labelType: NavigationRailLabelType.all,
       useIndicator: true,
+      // The Android TV experience is still beta — flag it in the rail.
+      leading: isTv
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'BETA',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+            )
+          : null,
       destinations: destinations,
       selectedIndex:
           (widget.currentIndex >= 0 &&
