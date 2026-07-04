@@ -48,7 +48,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
   bool _visible = true;
   Timer? _hideTimer;
   final FocusScopeNode _scope = FocusScopeNode(debugLabel: 'tvPlayer');
-  final FocusNode _playFocus = FocusNode(debugLabel: 'tvPlayerPlayPause');
+  final FocusNode _seekFocus = FocusNode(debugLabel: 'tvPlayerSeek');
   static const _hideAfter = Duration(seconds: 4);
 
   @override
@@ -57,7 +57,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
     widget.revealControls.addListener(_reveal);
     _startHideTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _playFocus.requestFocus();
+      if (mounted) _seekFocus.requestFocus();
     });
   }
 
@@ -66,7 +66,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
     widget.revealControls.removeListener(_reveal);
     _hideTimer?.cancel();
     _scope.dispose();
-    _playFocus.dispose();
+    _seekFocus.dispose();
     super.dispose();
   }
 
@@ -77,7 +77,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
     if (!_scope.hasFocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        (_playFocus.canRequestFocus ? _playFocus : _scope).requestFocus();
+        (_seekFocus.canRequestFocus ? _seekFocus : _scope).requestFocus();
       });
     }
   }
@@ -201,11 +201,9 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                     // prev/next-episode buttons removed.
                     Row(
                       children: [
-                        _PlayPauseButton(
-                          player: widget.player,
-                          accent: accent,
-                          focusNode: _playFocus,
-                        ),
+                        // Non-focusable — OK/Select on the seek bar toggles it
+                        // (Netflix model); it just reflects the current state.
+                        _PlayPauseIndicator(player: widget.player),
                         const SizedBox(width: 14),
                         _PositionText(player: widget.player),
                         const SizedBox(width: 12),
@@ -213,6 +211,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                           child: _TvSeekBar(
                             player: widget.player,
                             accent: accent,
+                            focusNode: _seekFocus,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -300,17 +299,12 @@ class _TvFocusableState extends State<_TvFocusable> {
   }
 }
 
-/// The big center play/pause, focus-highlighted.
-class _PlayPauseButton extends StatelessWidget {
-  const _PlayPauseButton({
-    required this.player,
-    required this.accent,
-    required this.focusNode,
-  });
+/// Non-focusable play/pause indicator — reflects state; toggled by OK on the
+/// seek bar (Netflix model), so it isn't part of d-pad focus traversal.
+class _PlayPauseIndicator extends StatelessWidget {
+  const _PlayPauseIndicator({required this.player});
 
   final Player player;
-  final Color accent;
-  final FocusNode focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -319,10 +313,8 @@ class _PlayPauseButton extends StatelessWidget {
       initialData: player.state.playing,
       builder: (context, snapshot) {
         final playing = snapshot.data ?? false;
-        return _TvFocusable(
-          accent: accent,
-          focusNode: focusNode,
-          onPressed: player.playOrPause,
+        return Padding(
+          padding: const EdgeInsets.all(6),
           child: Icon(
             playing ? Icons.pause : Icons.play_arrow,
             color: Colors.white,
@@ -498,9 +490,10 @@ class _AutoplayToggleState extends State<_AutoplayToggle> {
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: _focused
-                ? Border.all(color: widget.accent, width: 2)
-                : null,
+            // Theme tint on focus (like the settings toggles), not an outline.
+            color: _focused
+                ? widget.accent.withValues(alpha: 0.25)
+                : Colors.transparent,
           ),
           child: _AutoplaySwitch(on: widget.on, accent: widget.accent),
         ),
@@ -653,10 +646,15 @@ class _TrackPillState extends State<_TrackPill> {
 
 /// A focusable seek bar: Left/Right seek a small fixed amount; Up/Down escape.
 class _TvSeekBar extends StatefulWidget {
-  const _TvSeekBar({required this.player, required this.accent});
+  const _TvSeekBar({
+    required this.player,
+    required this.accent,
+    this.focusNode,
+  });
 
   final Player player;
   final Color accent;
+  final FocusNode? focusNode;
 
   @override
   State<_TvSeekBar> createState() => _TvSeekBarState();
@@ -677,6 +675,7 @@ class _TvSeekBarState extends State<_TvSeekBar> {
   @override
   Widget build(BuildContext context) {
     return Focus(
+      focusNode: widget.focusNode,
       onFocusChange: (f) => setState(() => _focused = f),
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent || event is KeyRepeatEvent) {
@@ -689,7 +688,12 @@ class _TvSeekBarState extends State<_TvSeekBar> {
             _seek(_step);
             return KeyEventResult.handled;
           }
-          // Up / Down / Select fall through so focus can leave the bar.
+          // OK/Select toggles play/pause (Netflix model — no separate button).
+          if (event is KeyDownEvent && _isSelect(k)) {
+            widget.player.playOrPause();
+            return KeyEventResult.handled;
+          }
+          // Up / Down fall through so focus can leave the bar.
         }
         return KeyEventResult.ignored;
       },
@@ -702,21 +706,59 @@ class _TvSeekBarState extends State<_TvSeekBar> {
           final frac = dur.inMilliseconds > 0
               ? (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0)
               : 0.0;
-          return Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: _focused
-                ? BoxDecoration(
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: widget.accent, width: 2),
-                  )
-                : null,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: frac,
-                minHeight: _focused ? 6 : 4,
-                backgroundColor: Colors.white24,
-                valueColor: AlwaysStoppedAnimation<Color>(widget.accent),
+          final barH = _focused ? 6.0 : 4.0;
+          const knob = 16.0;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: SizedBox(
+              height: 16,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final w = constraints.maxWidth;
+                  return Stack(
+                    children: [
+                      // Track + progress, vertically centred.
+                      Align(
+                        alignment: Alignment.center,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(barH / 2),
+                          child: SizedBox(
+                            height: barH,
+                            width: w,
+                            child: LinearProgressIndicator(
+                              value: frac,
+                              backgroundColor: Colors.white24,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                widget.accent,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Scrubber handle at the current position when focused —
+                      // the focus affordance instead of an outline.
+                      if (_focused)
+                        Positioned(
+                          left: (frac * (w - knob)).clamp(0.0, w - knob),
+                          top: (16 - knob) / 2,
+                          child: Container(
+                            width: knob,
+                            height: knob,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.4),
+                                  blurRadius: 3,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
           );
