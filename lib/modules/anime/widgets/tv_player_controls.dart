@@ -124,7 +124,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                   ),
                 ),
               ),
-              // Top-left: back / restart / gear.
+              // Top-left: back / restart / autoplay (gear lives by the pills).
               Positioned(
                 top: safeV,
                 left: safeH,
@@ -143,12 +143,6 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                         Icons.replay_outlined,
                         color: Colors.white,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    _TvFocusable(
-                      accent: accent,
-                      onPressed: widget.onSettings,
-                      child: const Icon(Icons.settings, color: Colors.white),
                     ),
                     const SizedBox(width: 8),
                     // Autoplay-next — YouTube-style labelled switch.
@@ -222,7 +216,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        _DurationText(player: widget.player),
+                        _RemainingText(player: widget.player),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -232,6 +226,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                       accent: accent,
                       qualityListenable: widget.qualityListenable,
                       buildQualityOptions: widget.buildQualityOptions,
+                      onSettings: widget.onSettings,
                     ),
                   ],
                 ),
@@ -363,12 +358,14 @@ class _PillBar extends StatelessWidget {
     required this.accent,
     required this.qualityListenable,
     required this.buildQualityOptions,
+    required this.onSettings,
   });
 
   final Player player;
   final Color accent;
   final Listenable qualityListenable;
   final List<TvTrackOption> Function() buildQualityOptions;
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -438,7 +435,18 @@ class _PillBar extends StatelessWidget {
                   if (i > 0) children.add(const _PillDivider());
                   children.addAll(groups[i]);
                 }
-                if (children.isEmpty) return const SizedBox.shrink();
+                // Gear pill at the end of the row (moved here from the top bar),
+                // sized to match the track pills.
+                if (children.isNotEmpty) children.add(const _PillDivider());
+                children.add(
+                  _TrackPill(
+                    accent: accent,
+                    icon: Icons.settings,
+                    label: 'Settings',
+                    selected: false,
+                    onTap: onSettings,
+                  ),
+                );
                 return Wrap(
                   alignment: WrapAlignment.center,
                   crossAxisAlignment: WrapCrossAlignment.center,
@@ -793,6 +801,17 @@ String _fmt(Duration d) {
   return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
 }
 
+// Monospace + tabular figures so the timestamps read cleanly and don't jitter
+// as the digits change.
+TextStyle _timeStyle(Color color) => TextStyle(
+  color: color,
+  fontSize: 15,
+  fontFamily: 'monospace',
+  fontWeight: FontWeight.w600,
+  letterSpacing: 0.3,
+  fontFeatures: const [FontFeature.tabularFigures()],
+);
+
 class _PositionText extends StatelessWidget {
   const _PositionText({required this.player});
   final Player player;
@@ -803,24 +822,29 @@ class _PositionText extends StatelessWidget {
       initialData: player.state.position,
       builder: (context, snapshot) => Text(
         _fmt(snapshot.data ?? Duration.zero),
-        style: const TextStyle(color: Colors.white, fontSize: 13),
+        style: _timeStyle(Colors.white),
       ),
     );
   }
 }
 
-class _DurationText extends StatelessWidget {
-  const _DurationText({required this.player});
+/// Right-side timestamp counts DOWN — time remaining (e.g. "-45:32"), like
+/// Netflix.
+class _RemainingText extends StatelessWidget {
+  const _RemainingText({required this.player});
   final Player player;
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<Duration>(
-      stream: player.stream.duration,
-      initialData: player.state.duration,
-      builder: (context, snapshot) => Text(
-        _fmt(snapshot.data ?? Duration.zero),
-        style: const TextStyle(color: Colors.white70, fontSize: 13),
-      ),
+      stream: player.stream.position,
+      initialData: player.state.position,
+      builder: (context, snapshot) {
+        final pos = snapshot.data ?? Duration.zero;
+        final dur = player.state.duration;
+        var remaining = dur - pos;
+        if (remaining < Duration.zero) remaining = Duration.zero;
+        return Text('-${_fmt(remaining)}', style: _timeStyle(Colors.white70));
+      },
     );
   }
 }

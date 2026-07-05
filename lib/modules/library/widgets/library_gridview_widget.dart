@@ -49,7 +49,7 @@ class _LibraryGridViewWidgetState extends State<LibraryGridViewWidget> {
         final gridSize = ref.watch(
           libraryGridSizeStateProvider(itemType: widget.itemType),
         );
-        return GridViewWidget(
+        final grid = GridViewWidget(
           gridSize: gridSize,
           childAspectRatio: widget.isComfortableGrid ? 0.642 : 0.69,
           itemCount: widget.entriesManga.length,
@@ -195,6 +195,10 @@ class _LibraryGridViewWidgetState extends State<LibraryGridViewWidget> {
             );
           },
         );
+        // On TV, give the grid its own focus scope so directional Down from the
+        // app bar / category tabs re-enters it and restores the last-focused
+        // cover — fixes "can't get back to the grid" after moving to the top.
+        return isTv ? FocusScope(child: grid) : grid;
       },
     );
   }
