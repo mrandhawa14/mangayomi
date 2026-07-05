@@ -1577,6 +1577,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       onBack: () => Navigator.maybePop(context),
       onRestart: () => _player.seek(Duration.zero),
       onSettings: () => _videoSettingDraggableMenu(context),
+      hasNext: hasNextEpisode,
+      onNext: hasNextEpisode
+          ? () => pushToNewEpisode(context, _streamController.getNextEpisode())
+          : null,
       qualityListenable: _video,
       buildQualityOptions: _buildTvQualityOptions,
     );

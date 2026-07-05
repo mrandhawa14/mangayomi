@@ -24,6 +24,8 @@ class TvPlayerControls extends StatefulWidget {
     required this.onBack,
     required this.onRestart,
     required this.onSettings,
+    required this.hasNext,
+    required this.onNext,
     required this.qualityListenable,
     required this.buildQualityOptions,
   });
@@ -35,6 +37,8 @@ class TvPlayerControls extends StatefulWidget {
   final VoidCallback onBack;
   final VoidCallback onRestart;
   final VoidCallback onSettings;
+  final bool hasNext;
+  final VoidCallback? onNext;
   // Quality = the source video list (e.g. "1080p Sub"/"1080p Dub") — the real
   // dub/sub control here. Rebuilt when [qualityListenable] fires.
   final Listenable qualityListenable;
@@ -217,6 +221,19 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                         ),
                         const SizedBox(width: 12),
                         _RemainingText(player: widget.player),
+                        // Manual skip to the next episode (autoplay still
+                        // auto-advances at the end); shown only if there is one.
+                        if (widget.hasNext) ...[
+                          const SizedBox(width: 8),
+                          _TvFocusable(
+                            accent: accent,
+                            onPressed: widget.onNext,
+                            child: const Icon(
+                              Icons.skip_next,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 14),
