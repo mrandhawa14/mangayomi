@@ -382,7 +382,35 @@ end""",
       });
     }
 
+    _seedDefaultAnimeRepos(isar);
     return isar;
+  }
+
+  // Seeds two anime extension repos on startup so test builds have sources
+  // without re-adding them each time. Only adds URLs that are missing.
+  // NOTE: strip this before any upstream PR — no repo URLs should ship.
+  void _seedDefaultAnimeRepos(Isar isar) {
+    const urls = [
+      'https://raw.githubusercontent.com/Swakshan/mangayomi-swak-extensions/refs/heads/main/anime_index.json',
+      'https://raw.githubusercontent.com/Mallyd11/mangayomi-anime-extensions/main/anime_index.json',
+    ];
+    try {
+      final settings = isar.settings.getSync(227);
+      if (settings == null) return;
+      final repos = [...(settings.animeExtensionsRepo ?? <Repo>[])];
+      var changed = false;
+      for (final url in urls) {
+        if (!repos.any((r) => r.jsonUrl == url)) {
+          repos.add(Repo(jsonUrl: url));
+          changed = true;
+        }
+      }
+      if (changed) {
+        isar.writeTxnSync(
+          () => isar.settings.putSync(settings..animeExtensionsRepo = repos),
+        );
+      }
+    } catch (_) {}
   }
 
   Future<Isar> _openIsar(Directory dir, bool inspector) {

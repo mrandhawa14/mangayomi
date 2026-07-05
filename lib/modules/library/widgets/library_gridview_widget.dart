@@ -5,6 +5,7 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/library/widgets/continue_reader_button.dart';
 import 'package:mangayomi/modules/manga/detail/providers/state_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/modules/library/widgets/library_entry_utils.dart';
 import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
 import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
@@ -59,6 +60,9 @@ class _LibraryGridViewWidgetState extends State<LibraryGridViewWidget> {
             return Padding(
               padding: const EdgeInsets.all(2),
               child: CoverViewWidget(
+                // On TV, make the first cover the content's focus target so the
+                // d-pad reliably lands on the grid (not the app bar).
+                autofocus: isTv && index == 0,
                 isLongPressed: widget.mangaIdsList.contains(entry.id),
                 isComfortableGrid: widget.isComfortableGrid,
                 bottomTextWidget: BottomTextWidget(

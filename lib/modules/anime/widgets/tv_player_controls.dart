@@ -96,7 +96,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
     // interactive controls/title are inset — the scrim stays full-bleed, per
     // Android TV layout guidance.
     final size = MediaQuery.of(context).size;
-    final safeH = size.width * 0.05;
+    final safeH = size.width * 0.08;
     final safeV = size.height * 0.05;
     return FocusScope(
       node: _scope,
@@ -203,11 +203,8 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Play/pause on the left of the seek line (Netflix-style);
-                    // prev/next-episode buttons removed.
-                    // Play/pause on its own row so it's d-pad-reachable (the
-                    // seek bar owns Left/Right for scrubbing). Default focus +
-                    // highlighted; OK on the seek bar also toggles it.
+                    // Play/pause inline on the left of the seek line. Default
+                    // focus + highlighted; OK on the seek bar also toggles it.
                     Row(
                       children: [
                         _PlayPauseButton(
@@ -215,11 +212,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                           accent: accent,
                           focusNode: _playFocus,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
+                        const SizedBox(width: 14),
                         _PositionText(player: widget.player),
                         const SizedBox(width: 12),
                         Expanded(
