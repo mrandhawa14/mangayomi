@@ -228,9 +228,12 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                           _TvFocusable(
                             accent: accent,
                             onPressed: widget.onNext,
+                            // Match the play/pause size (34) so the two
+                            // transport controls frame the seek bar evenly.
                             child: const Icon(
                               Icons.skip_next,
                               color: Colors.white,
+                              size: 34,
                             ),
                           ),
                         ],

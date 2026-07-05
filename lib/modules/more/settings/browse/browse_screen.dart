@@ -44,7 +44,6 @@ class BrowseSScreen extends ConsumerWidget {
             // TV-only gates (shows manga & novel again across the app).
             if (isTv)
               SwitchListTile(
-                secondary: const Icon(Icons.tv_outlined),
                 title: const Text('Anime only (beta)'),
                 subtitle: const Text(
                   'Hide manga & novel across the app. Turn off to show everything.',
