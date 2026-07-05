@@ -8,6 +8,8 @@ import 'package:mangayomi/modules/library/providers/library_source_badge_provide
 import 'package:mangayomi/modules/manga/detail/widgets/chapter_filter_list_tile_widget.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/chapter_sort_list_tile_widget.dart';
 import 'package:mangayomi/modules/widgets/custom_draggable_tabbar.dart';
+import 'package:mangayomi/modules/widgets/tv_escapable_slider.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 
@@ -511,30 +513,43 @@ class _GridSizeSlider extends ConsumerWidget {
               data: SliderTheme.of(context).copyWith(
                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 5.0),
               ),
-              child: Slider(
-                min: 0.0,
-                max: 7,
-                divisions: 7,
-                value: gridSize.toDouble(),
-                onChanged: (value) {
-                  HapticFeedback.vibrate();
-                  ref
-                      .read(
-                        libraryGridSizeStateProvider(
-                          itemType: itemType,
-                        ).notifier,
-                      )
-                      .set(value.toInt());
-                },
-                onChangeEnd: (value) {
-                  ref
-                      .read(
-                        libraryGridSizeStateProvider(
-                          itemType: itemType,
-                        ).notifier,
-                      )
-                      .set(value.toInt(), end: true);
-                },
+              child: TvEscapableSlider(
+                enabled: isTv,
+                onDecrease: () => ref
+                    .read(
+                      libraryGridSizeStateProvider(itemType: itemType).notifier,
+                    )
+                    .set((gridSize - 1).clamp(0, 7), end: true),
+                onIncrease: () => ref
+                    .read(
+                      libraryGridSizeStateProvider(itemType: itemType).notifier,
+                    )
+                    .set((gridSize + 1).clamp(0, 7), end: true),
+                child: Slider(
+                  min: 0.0,
+                  max: 7,
+                  divisions: 7,
+                  value: gridSize.toDouble(),
+                  onChanged: (value) {
+                    HapticFeedback.vibrate();
+                    ref
+                        .read(
+                          libraryGridSizeStateProvider(
+                            itemType: itemType,
+                          ).notifier,
+                        )
+                        .set(value.toInt());
+                  },
+                  onChangeEnd: (value) {
+                    ref
+                        .read(
+                          libraryGridSizeStateProvider(
+                            itemType: itemType,
+                          ).notifier,
+                        )
+                        .set(value.toInt(), end: true);
+                  },
+                ),
               ),
             ),
           ),
