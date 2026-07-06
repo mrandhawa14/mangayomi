@@ -14,9 +14,15 @@ concurrency:
 
 jobs:
   macos:
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      # A plugin (connectivity_plus) uses newer Network.framework APIs
+      # (NWPath.isUltraConstrained), so build against the latest SDK.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
 
       - uses: subosito/flutter-action@v2
         with:
