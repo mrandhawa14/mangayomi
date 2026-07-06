@@ -6,6 +6,7 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/modules/more/providers/algorithm_weights_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/general/providers/general_state_provider.dart';
+import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/modules/more/settings/general/providers/doh_provider_notifier.dart';
 import 'package:mangayomi/services/http/doh/doh_custom_store.dart';
@@ -58,6 +59,17 @@ class _GeneralStateScreen extends ConsumerState<GeneralScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
+            if (kDebugMode)
+              SwitchListTile(
+                secondary: const Icon(Icons.tv_outlined),
+                title: const Text('Force TV mode (dev)'),
+                subtitle: const Text(
+                  'Render the Android TV UI on this device and navigate with '
+                  'arrow keys. Restart the app to apply.',
+                ),
+                value: ref.watch(devForceTvProvider),
+                onChanged: (v) => ref.read(devForceTvProvider.notifier).set(v),
+              ),
             ExpansionTile(
               title: Text(l10n.dns_over_https),
               initiallyExpanded: doHState.enabled,

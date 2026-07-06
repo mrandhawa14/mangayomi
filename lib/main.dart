@@ -228,6 +228,12 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
   await DohCustomStore.openBox();
   await CfProxyStore.openBox();
   await openTvPrefsBox();
+  // Dev-only: let any device force TV mode so the Android TV UI can be tested
+  // with a keyboard / arrow keys without a real TV. Read once the prefs box is
+  // open; gated to debug builds so it never ships in release.
+  if (kDebugMode && Hive.box('tv_prefs').get('dev_force_tv') == true) {
+    isTv = true;
+  }
   await openUpdateErrorsBox();
   await openLibraryPrefsBox();
   await openSavedSearchesBox();

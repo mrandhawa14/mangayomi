@@ -9,6 +9,7 @@ const _overrideKey = 'anime_only_override';
 const _playerStyleKey = 'tv_player_style';
 const _homeStyleKey = 'tv_home_style';
 const _cardScaleKey = 'tv_home_card_scale';
+const devForceTvKey = 'dev_force_tv';
 
 /// Opens the backing box. Called once at startup.
 Future<void> openTvPrefsBox() async {
@@ -119,4 +120,27 @@ class TvHomeCardScale extends Notifier<int> {
   }
 
   void cycle() => set((state + 1) % 3);
+}
+
+/// Dev-only: force TV mode (`isTv`) on any device so the Android TV UI can be
+/// exercised with a keyboard / arrow keys without a real TV. Persisted; applied
+/// at startup in main.dart (behind `kDebugMode`). Takes effect after a restart.
+final devForceTvProvider = NotifierProvider<DevForceTv, bool>(DevForceTv.new);
+
+class DevForceTv extends Notifier<bool> {
+  @override
+  bool build() {
+    if (Hive.isBoxOpen(_boxName)) {
+      final v = Hive.box(_boxName).get(devForceTvKey);
+      if (v is bool) return v;
+    }
+    return false;
+  }
+
+  void set(bool value) {
+    state = value;
+    if (Hive.isBoxOpen(_boxName)) {
+      Hive.box(_boxName).put(devForceTvKey, value);
+    }
+  }
 }
