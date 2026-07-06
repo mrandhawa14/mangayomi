@@ -14,6 +14,7 @@ import 'package:mangayomi/modules/library/providers/isar_providers.dart';
 import 'package:mangayomi/modules/library/widgets/library_entry_utils.dart';
 import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/more/categories/providers/isar_providers.dart';
+import 'package:mangayomi/modules/more/categories/widgets/custom_textfield.dart';
 import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
 import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
@@ -43,6 +44,9 @@ class TvAnimeHomeView extends ConsumerStatefulWidget {
 class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
   final _searchController = TextEditingController();
   String _query = '';
+  // Selected category filter: null = "All" (the curated home). A non-empty
+  // search query overrides this while active.
+  int? _selected;
 
   @override
   void dispose() {
@@ -120,18 +124,42 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                   .toList()
                 ..sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0));
 
+          // If the selected category was removed, fall back to All.
+          final selectedId =
+              (_selected != null && cats.any((c) => c.id == _selected))
+              ? _selected
+              : null;
+
           final q = _query.trim().toLowerCase();
           final searching = q.isNotEmpty;
-          final matches = searching
-              ? (allAnime
+
+          Widget content;
+          if (searching) {
+            final matches =
+                allAnime
                     .where((m) => (m.name ?? '').toLowerCase().contains(q))
                     .toList()
                   ..sort(
                     (a, b) => (a.name ?? '').toLowerCase().compareTo(
                       (b.name ?? '').toLowerCase(),
                     ),
-                  ))
-              : const <Manga>[];
+                  );
+            content = _MangaGrid(items: matches, emptyLabel: 'No matching anime');
+          } else if (selectedId == null) {
+            content = ListView(
+              padding: const EdgeInsets.only(bottom: 28),
+              children: [
+                _TvHomeHero(manga: hero),
+                if (continueList.isNotEmpty)
+                  _TvHomeRow(title: 'Continue Watching', items: continueList),
+                if (newEpisodes.isNotEmpty)
+                  _TvHomeRow(title: 'New Episodes', items: newEpisodes),
+                _TvHomeRow(title: 'Recently Added', items: recent),
+              ],
+            );
+          } else {
+            content = _CategoryGrid(categoryId: selectedId!);
+          }
 
           return Column(
             children: [
@@ -139,28 +167,12 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                 controller: _searchController,
                 onChanged: (v) => setState(() => _query = v),
               ),
-              Expanded(
-                child: searching
-                    ? _SearchGrid(items: matches)
-                    : ListView(
-                        padding: const EdgeInsets.only(bottom: 28),
-                        children: [
-                          _TvHomeHero(manga: hero),
-                          if (continueList.isNotEmpty)
-                            _TvHomeRow(
-                              title: 'Continue Watching',
-                              items: continueList,
-                            ),
-                          if (newEpisodes.isNotEmpty)
-                            _TvHomeRow(
-                              title: 'New Episodes',
-                              items: newEpisodes,
-                            ),
-                          _TvHomeRow(title: 'Recently Added', items: recent),
-                          for (final cat in cats) _TvCategoryRow(category: cat),
-                        ],
-                      ),
+              _CategoryPills(
+                selected: selectedId,
+                categories: cats,
+                onSelect: (id) => setState(() => _selected = id),
               ),
+              Expanded(child: content),
             ],
           );
         },
@@ -263,18 +275,20 @@ class _CardSizeButtonState extends ConsumerState<_CardSizeButton> {
   }
 }
 
-/// Flat grid of search matches (leaf view — a plain grid navigates predictably).
-class _SearchGrid extends ConsumerWidget {
-  const _SearchGrid({required this.items});
+/// Flat grid of a Manga list (leaf view — a plain grid navigates predictably).
+/// Shared by search results and a selected category.
+class _MangaGrid extends ConsumerWidget {
+  const _MangaGrid({required this.items, required this.emptyLabel});
   final List<Manga> items;
+  final String emptyLabel;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (items.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('No matching anime'),
+          padding: const EdgeInsets.all(24),
+          child: Text(emptyLabel, textAlign: TextAlign.center),
         ),
       );
     }
@@ -432,7 +446,9 @@ class _HeroContinueButtonState extends State<_HeroContinueButton> {
   Widget build(BuildContext context) {
     final accent = context.primaryColor;
     return Focus(
-      autofocus: true,
+      // Entry focus lives on the "All" pill; the hero must not steal it when
+      // switching back to All from a category view.
+      autofocus: false,
       onFocusChange: (f) {
         setState(() => _focused = f);
         // When focus returns to the hero (e.g. scrolling up out of the rows),
@@ -530,10 +546,10 @@ class _TvHomeRow extends ConsumerWidget {
   }
 }
 
-/// A single category's row — watches its own membership and hides when empty.
-class _TvCategoryRow extends ConsumerWidget {
-  const _TvCategoryRow({required this.category});
-  final Category category;
+/// A selected category's grid — watches its membership stream.
+class _CategoryGrid extends ConsumerWidget {
+  const _CategoryGrid({required this.categoryId});
+  final int categoryId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -541,16 +557,212 @@ class _TvCategoryRow extends ConsumerWidget {
         ref
             .watch(
               getAllMangaStreamProvider(
-                categoryId: category.id,
+                categoryId: categoryId,
                 itemType: ItemType.anime,
               ),
             )
             .asData
             ?.value ??
         const <Manga>[];
-    if (items.isEmpty) return const SizedBox.shrink();
-    return _TvHomeRow(title: category.name ?? '', items: items);
+    return _MangaGrid(
+      items: items,
+      emptyLabel:
+          'No anime in this category yet.\n'
+          'Add titles to it from a title’s detail page.',
+    );
   }
+}
+
+/// The category filter bar under the search row: [All] + a pill per category +
+/// [+ Category]. Selecting sets the filter but keeps focus on the pill.
+class _CategoryPills extends StatelessWidget {
+  const _CategoryPills({
+    required this.selected,
+    required this.categories,
+    required this.onSelect,
+  });
+  final int? selected;
+  final List<Category> categories;
+  final ValueChanged<int?> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 50,
+      child: FocusTraversalGroup(
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 6),
+          children: [
+            _Pill(
+              label: 'All',
+              selected: selected == null,
+              autofocus: true,
+              onTap: () => onSelect(null),
+            ),
+            for (final c in categories)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: _Pill(
+                  label: c.name ?? '',
+                  selected: selected == c.id,
+                  onTap: () => onSelect(c.id),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: _Pill(
+                label: 'Category',
+                icon: Icons.add,
+                onTap: () => _showAddCategoryDialog(context, categories),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A focusable filter pill: idle · focused (accent fill) · selected
+/// (accent-tinted) — three clearly distinct states for a d-pad across a room.
+class _Pill extends StatefulWidget {
+  const _Pill({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.selected = false,
+    this.autofocus = false,
+  });
+  final String label;
+  final IconData? icon;
+  final bool selected;
+  final bool autofocus;
+  final VoidCallback onTap;
+
+  @override
+  State<_Pill> createState() => _PillState();
+}
+
+class _PillState extends State<_Pill> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.primaryColor;
+    final bg = _focused
+        ? accent
+        : widget.selected
+        ? accent.withValues(alpha: 0.22)
+        : Theme.of(context).hintColor.withValues(alpha: 0.14);
+    final fg = _focused
+        ? Colors.white
+        : widget.selected
+        ? accent
+        : Theme.of(context).colorScheme.onSurface;
+    return Focus(
+      autofocus: widget.autofocus,
+      onFocusChange: (f) {
+        setState(() => _focused = f);
+        if (f && context.mounted) {
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
+      },
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && _isSelectKey(event.logicalKey)) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: bg,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.icon != null) ...[
+                Icon(widget.icon, size: 16, color: fg),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                widget.label,
+                style: TextStyle(
+                  color: fg,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Reuses the categories screen's add-category flow to create an anime category
+/// inline from the home.
+void _showAddCategoryDialog(BuildContext context, List<Category> existing) {
+  final controller = TextEditingController();
+  bool isExist = false;
+  showDialog(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: const Text('New category'),
+        content: CustomTextFormField(
+          controller: controller,
+          entries: existing,
+          context: context,
+          exist: (v) => setState(() => isExist = v),
+          isExist: isExist,
+          val: (_) => setState(() {}),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: controller.text.trim().isEmpty || isExist
+                ? null
+                : () {
+                    final category = Category(
+                      forItemType: ItemType.anime,
+                      name: controller.text.trim(),
+                      updatedAt: DateTime.now().millisecondsSinceEpoch,
+                    );
+                    isar.writeTxnSync(() {
+                      isar.categorys.putSync(category..pos = category.id);
+                      final nulls = isar.categorys
+                          .filter()
+                          .posIsNull()
+                          .findAllSync();
+                      for (final c in nulls) {
+                        isar.categorys.putSync(c..pos = c.id);
+                      }
+                    });
+                    Navigator.pop(context);
+                  },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// A cover card: reuses [CoverViewWidget] (focus ring + badges) and scrolls
