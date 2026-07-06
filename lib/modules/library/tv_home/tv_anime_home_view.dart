@@ -48,10 +48,48 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
   // search query overrides this while active.
   int? _selected;
 
+  // Each vertical section (top bar, pills, hero, each row) gets its own
+  // FocusScope. Up/Down move whole-section to whole-section — restoring each
+  // scope's remembered child — instead of Flutter's geometric directional
+  // focus, which skips items that aren't exactly aligned above/below.
+  final _scopeTopbar = FocusScopeNode(debugLabel: 'tvHomeTopbar');
+  final _scopePills = FocusScopeNode(debugLabel: 'tvHomePills');
+  final _scopeHero = FocusScopeNode(debugLabel: 'tvHomeHero');
+  final _scopeRows = List.generate(
+    12,
+    (i) => FocusScopeNode(debugLabel: 'tvHomeRow$i'),
+  );
+  List<FocusScopeNode> _order = const [];
+
   @override
   void dispose() {
     _searchController.dispose();
+    _scopeTopbar.dispose();
+    _scopePills.dispose();
+    _scopeHero.dispose();
+    for (final s in _scopeRows) {
+      s.dispose();
+    }
     super.dispose();
+  }
+
+  // Move focus between the ordered vertical sections on Up/Down. Defer to the
+  // default (geometric) focus at the edges and for the 2D grid views, which
+  // aren't registered in `_order`.
+  KeyEventResult _handleVertical(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final k = event.logicalKey;
+    if (k != LogicalKeyboardKey.arrowDown && k != LogicalKeyboardKey.arrowUp) {
+      return KeyEventResult.ignored;
+    }
+    final cur = _order.indexWhere((s) => s.hasFocus);
+    if (cur == -1) return KeyEventResult.ignored;
+    final target = k == LogicalKeyboardKey.arrowDown ? cur + 1 : cur - 1;
+    if (target < 0 || target >= _order.length) return KeyEventResult.ignored;
+    _order[target].requestFocus();
+    return KeyEventResult.handled;
   }
 
   @override
@@ -133,6 +171,10 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
           final q = _query.trim().toLowerCase();
           final searching = q.isNotEmpty;
 
+          // Ordered vertical sections for whole-row Up/Down navigation. Top bar
+          // and pills are always first; the All view adds hero + one scope per
+          // row. Grid views leave the grid out (default 2D focus handles it).
+          final order = <FocusScopeNode>[_scopeTopbar, _scopePills];
           Widget content;
           if (searching) {
             final matches =
@@ -146,34 +188,58 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                   );
             content = _MangaGrid(items: matches, emptyLabel: 'No matching anime');
           } else if (selectedId == null) {
+            order.add(_scopeHero);
+            final rows = <Widget>[
+              FocusScope(node: _scopeHero, child: _TvHomeHero(manga: hero)),
+            ];
+            var ri = 0;
+            void addRow(String title, List<Manga> items) {
+              final scope = _scopeRows[ri++];
+              order.add(scope);
+              rows.add(
+                FocusScope(
+                  node: scope,
+                  child: _TvHomeRow(title: title, items: items),
+                ),
+              );
+            }
+
+            if (continueList.isNotEmpty) {
+              addRow('Continue Watching', continueList);
+            }
+            if (newEpisodes.isNotEmpty) addRow('New Episodes', newEpisodes);
+            addRow('Recently Added', recent);
             content = ListView(
               padding: const EdgeInsets.only(bottom: 28),
-              children: [
-                _TvHomeHero(manga: hero),
-                if (continueList.isNotEmpty)
-                  _TvHomeRow(title: 'Continue Watching', items: continueList),
-                if (newEpisodes.isNotEmpty)
-                  _TvHomeRow(title: 'New Episodes', items: newEpisodes),
-                _TvHomeRow(title: 'Recently Added', items: recent),
-              ],
+              children: rows,
             );
           } else {
             content = _CategoryGrid(categoryId: selectedId!);
           }
+          _order = order;
 
-          return Column(
-            children: [
-              _TvHomeTopBar(
-                controller: _searchController,
-                onChanged: (v) => setState(() => _query = v),
-              ),
-              _CategoryPills(
-                selected: selectedId,
-                categories: cats,
-                onSelect: (id) => setState(() => _selected = id),
-              ),
-              Expanded(child: content),
-            ],
+          return Focus(
+            onKeyEvent: _handleVertical,
+            child: Column(
+              children: [
+                FocusScope(
+                  node: _scopeTopbar,
+                  child: _TvHomeTopBar(
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _query = v),
+                  ),
+                ),
+                FocusScope(
+                  node: _scopePills,
+                  child: _CategoryPills(
+                    selected: selectedId,
+                    categories: cats,
+                    onSelect: (id) => setState(() => _selected = id),
+                  ),
+                ),
+                Expanded(child: content),
+              ],
+            ),
           );
         },
       ),
@@ -588,36 +654,45 @@ class _CategoryPills extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 50,
-      child: FocusTraversalGroup(
-        child: ListView(
+      height: 42,
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 6),
-          children: [
-            _Pill(
-              label: 'All',
-              selected: selected == null,
-              autofocus: true,
-              onTap: () => onSelect(null),
-            ),
-            for (final c in categories)
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: _Pill(
-                  label: c.name ?? '',
-                  selected: selected == c.id,
-                  onTap: () => onSelect(c.id),
-                ),
+          child: ConstrainedBox(
+            // minWidth = viewport, so the Row centers its pills when they fit
+            // and simply grows/scrolls when there are many categories.
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: FocusTraversalGroup(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _Pill(
+                    label: 'All',
+                    selected: selected == null,
+                    autofocus: true,
+                    onTap: () => onSelect(null),
+                  ),
+                  for (final c in categories)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: _Pill(
+                        label: c.name ?? '',
+                        selected: selected == c.id,
+                        onTap: () => onSelect(c.id),
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: _Pill(
+                      label: 'Category',
+                      icon: Icons.add,
+                      onTap: () => _showAddCategoryDialog(context, categories),
+                    ),
+                  ),
+                ],
               ),
-            Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: _Pill(
-                label: 'Category',
-                icon: Icons.add,
-                onTap: () => _showAddCategoryDialog(context, categories),
-              ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -664,7 +739,7 @@ class _PillState extends State<_Pill> {
       autofocus: widget.autofocus,
       onFocusChange: (f) {
         setState(() => _focused = f);
-        if (f && context.mounted) {
+        if (f && context.mounted && Scrollable.maybeOf(context) != null) {
           Scrollable.ensureVisible(
             context,
             alignment: 0.5,
@@ -684,17 +759,16 @@ class _PillState extends State<_Pill> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             color: bg,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.icon != null) ...[
-                Icon(widget.icon, size: 16, color: fg),
+                Icon(widget.icon, size: 14, color: fg),
                 const SizedBox(width: 4),
               ],
               Text(
@@ -702,7 +776,7 @@ class _PillState extends State<_Pill> {
                 style: TextStyle(
                   color: fg,
                   fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                  fontSize: 12,
                 ),
               ),
             ],
