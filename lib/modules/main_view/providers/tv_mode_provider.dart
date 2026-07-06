@@ -7,6 +7,7 @@ import 'package:mangayomi/utils/platform_utils.dart';
 const _boxName = 'tv_prefs';
 const _overrideKey = 'anime_only_override';
 const _playerStyleKey = 'tv_player_style';
+const _homeStyleKey = 'tv_home_style';
 
 /// Opens the backing box. Called once at startup.
 Future<void> openTvPrefsBox() async {
@@ -63,6 +64,32 @@ class TvPlayerStyle extends Notifier<bool> {
     state = value;
     if (Hive.isBoxOpen(_boxName)) {
       Hive.box(_boxName).put(_playerStyleKey, value);
+    }
+  }
+}
+
+/// Which anime library "home" to show on TV: `true` = the dedicated rows-based
+/// TV home (hero + Continue / New Episodes / Recently Added / category rows),
+/// `false` = the classic cover grid. Only consulted when [isTv]; phones and
+/// desktops always get the grid.
+final tvHomeStyleProvider = NotifierProvider<TvHomeStyle, bool>(
+  TvHomeStyle.new,
+);
+
+class TvHomeStyle extends Notifier<bool> {
+  @override
+  bool build() {
+    if (Hive.isBoxOpen(_boxName)) {
+      final v = Hive.box(_boxName).get(_homeStyleKey);
+      if (v is bool) return v;
+    }
+    return isTv; // default: rows home on TV, grid everywhere else
+  }
+
+  void set(bool value) {
+    state = value;
+    if (Hive.isBoxOpen(_boxName)) {
+      Hive.box(_boxName).put(_homeStyleKey, value);
     }
   }
 }

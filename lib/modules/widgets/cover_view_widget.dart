@@ -13,6 +13,10 @@ class CoverViewWidget extends StatefulWidget {
   // On TV, the first cover autofocuses so the grid becomes the content scope's
   // focus target (otherwise d-pad focus never reaches it).
   final bool autofocus;
+  // Notifies the parent when this card gains/loses focus — used by the TV home
+  // rows to scroll the focused card into view. Fires on any focus change,
+  // independent of the internal ring (which is gated to d-pad/keyboard input).
+  final ValueChanged<bool>? onFocusChange;
   const CoverViewWidget({
     super.key,
     required this.children,
@@ -24,6 +28,7 @@ class CoverViewWidget extends StatefulWidget {
     this.isLongPressed,
     this.onSecondaryTap,
     this.autofocus = false,
+    this.onFocusChange,
   });
 
   @override
@@ -59,6 +64,7 @@ class _CoverViewWidgetState extends State<CoverViewWidget> {
   }
 
   void _onFocusChange(bool hasFocus) {
+    widget.onFocusChange?.call(hasFocus);
     final show =
         hasFocus &&
         FocusManager.instance.highlightMode == FocusHighlightMode.traditional;

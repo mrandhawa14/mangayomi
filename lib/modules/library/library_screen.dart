@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
+import 'package:mangayomi/modules/library/tv_home/tv_anime_home_view.dart';
+import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/modules/library/providers/add_torrent.dart';
 import 'package:mangayomi/modules/library/providers/isar_providers.dart';
 import 'package:mangayomi/modules/library/providers/library_filter_provider.dart';
@@ -88,6 +91,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   Widget _buildWithSettings(Settings settings) {
+    // On Android TV the anime library shows the dedicated rows-based home
+    // instead of the flat grid — a d-pad-first, cover-forward shelf. Toggleable
+    // via tvHomeStyleProvider; every other surface keeps the grid.
+    if (isTv &&
+        widget.itemType == ItemType.anime &&
+        ref.watch(tvHomeStyleProvider)) {
+      return const TvAnimeHomeView();
+    }
     final categories = ref.watch(
       getMangaCategorieStreamProvider(itemType: widget.itemType),
     );
