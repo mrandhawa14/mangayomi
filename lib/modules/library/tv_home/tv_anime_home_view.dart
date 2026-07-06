@@ -8,6 +8,8 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/update.dart';
+import 'package:mangayomi/modules/history/providers/isar_providers.dart';
 import 'package:mangayomi/modules/library/providers/isar_providers.dart';
 import 'package:mangayomi/modules/library/widgets/library_entry_utils.dart';
 import 'package:mangayomi/modules/more/categories/providers/isar_providers.dart';
@@ -48,13 +50,45 @@ class TvAnimeHomeView extends ConsumerWidget {
         data: (allAnime) {
           if (allAnime.isEmpty) return const _EmptyHome();
 
-          // All rows derive from the single loaded anime list — no extra reads.
+          // Continue Watching = every anime you've actually played, from the
+          // watch history, most-recently-watched first (not just a flag).
+          final historyIds =
+              (ref
+                          .watch(
+                            getAllHistoryStreamProvider(
+                              itemType: ItemType.anime,
+                            ),
+                          )
+                          .asData
+                          ?.value ??
+                      const <History>[])
+                  .map((h) => h.mangaId)
+                  .whereType<int>()
+                  .toSet();
+          // New Episodes = the library-update feed (episodes a refresh
+          // detected as new), limited to ones still unwatched.
+          final updatedIds =
+              (ref
+                          .watch(
+                            getAllUpdateStreamProvider(itemType: ItemType.anime),
+                          )
+                          .asData
+                          ?.value ??
+                      const <Update>[])
+                  .map((u) => u.mangaId)
+                  .whereType<int>()
+                  .toSet();
+
           final continueList =
-              allAnime.where((m) => (m.lastRead ?? 0) > 0).toList()
+              allAnime.where((m) => historyIds.contains(m.id)).toList()
                 ..sort((a, b) => (b.lastRead ?? 0).compareTo(a.lastRead ?? 0));
           final newEpisodes =
               allAnime
-                  .where((m) => m.chapters.any((c) => !(c.isRead ?? true)))
+                  .where(
+                    (m) =>
+                        updatedIds.contains(m.id) &&
+                        m.chapters.any((c) => !(c.isRead ?? true)),
+                  )
                   .toList()
                 ..sort(
                   (a, b) => (b.lastUpdate ?? 0).compareTo(a.lastUpdate ?? 0),
@@ -219,7 +253,19 @@ class _HeroContinueButtonState extends State<_HeroContinueButton> {
     final accent = context.primaryColor;
     return Focus(
       autofocus: true,
-      onFocusChange: (f) => setState(() => _focused = f),
+      onFocusChange: (f) {
+        setState(() => _focused = f);
+        // When focus returns to the hero (e.g. scrolling up out of the rows),
+        // pull the page fully to the top so the whole poster is revealed
+        // instead of staying clipped under the first row.
+        if (f) {
+          Scrollable.maybeOf(context)?.position.animateTo(
+            0,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOut,
+          );
+        }
+      },
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent && _isSelectKey(event.logicalKey)) {
           _resume();
@@ -275,13 +321,10 @@ class _TvHomeRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
             child: Text(
-              title.toUpperCase(),
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.4,
-              ),
+              title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
           ),
           SizedBox(
@@ -450,7 +493,7 @@ class _EmptyHomeState extends State<_EmptyHome> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.video_library_outlined, size: 56, color: hint),
+          Icon(Icons.video_library_outlined, size: 56, color: accent),
           const SizedBox(height: 16),
           const Text(
             'Your anime library is empty',
@@ -477,13 +520,16 @@ class _EmptyHomeState extends State<_EmptyHome> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 120),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 22,
-                  vertical: 12,
+                  horizontal: 26,
+                  vertical: 13,
                 ),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: _focused ? accent : Colors.transparent,
-                  border: Border.all(color: accent, width: 2),
+                  borderRadius: BorderRadius.circular(28),
+                  color: _focused ? accent : accent.withValues(alpha: 0.12),
+                  border: Border.all(
+                    color: _focused ? accent : accent.withValues(alpha: 0.5),
+                    width: 1.5,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
