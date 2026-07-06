@@ -1,0 +1,48 @@
+# Dev-only macOS build so the Android TV UI can be exercised on a Mac (native
+# window + real keyboard arrows) via the "Force TV mode (dev)" toggle — no
+# emulator, no Fire TV. Debug build, ad-hoc signed; not for distribution.
+name: macOS dev build
+
+on:
+  push:
+    branches: [tv-test-build]
+  workflow_dispatch:
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Enable macOS desktop
+        run: flutter config --enable-macos-desktop
+
+      - name: Pub get
+        run: flutter pub get
+
+      # .g.dart is committed, so no build_runner needed (same as the Android job).
+      - name: Build macOS (debug, ad-hoc signed)
+        run: flutter build macos --debug
+
+      - name: Package .dmg
+        run: |
+          APP=$(ls -d build/macos/Build/Products/Debug/*.app | head -1)
+          echo "Packaging $APP"
+          # Ad-hoc sign so Gatekeeper lets it open (right-click → Open on first run).
+          codesign --force --deep --sign - "$APP" || true
+          hdiutil create -volname Mangayomi \
+            -srcfolder "$APP" -ov -format UDZO mangayomi-macos.dmg
+          ls -lah mangayomi-macos.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mangayomi-macos-dmg
+          path: mangayomi-macos.dmg
