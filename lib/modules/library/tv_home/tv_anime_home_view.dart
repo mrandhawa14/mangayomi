@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/category.dart';
@@ -424,18 +425,87 @@ class _TvHomeCard extends ConsumerWidget {
   }
 }
 
-class _EmptyHome extends StatelessWidget {
+/// Shown when the anime library is empty. Crucially it carries a *focusable*
+/// action: without one, the empty content has no focus target, so pressing
+/// Right from the rail lands on nothing and there's nothing to move Left from
+/// to get back — a d-pad dead end. The autofocused Browse button is that target
+/// (and Left from it falls through to the rail via the existing handler).
+class _EmptyHome extends StatefulWidget {
   const _EmptyHome();
 
   @override
+  State<_EmptyHome> createState() => _EmptyHomeState();
+}
+
+class _EmptyHomeState extends State<_EmptyHome> {
+  bool _focused = false;
+
+  void _browse() => context.go('/browse');
+
+  @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Text(
-          'Your anime library is empty.\nAdd anime from Browse to fill your home.',
-          textAlign: TextAlign.center,
-        ),
+    final accent = context.primaryColor;
+    final hint = Theme.of(context).hintColor;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.video_library_outlined, size: 56, color: hint),
+          const SizedBox(height: 16),
+          const Text(
+            'Your anime library is empty',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Add anime from Browse to fill your home',
+            style: TextStyle(color: hint),
+          ),
+          const SizedBox(height: 22),
+          Focus(
+            autofocus: true,
+            onFocusChange: (f) => setState(() => _focused = f),
+            onKeyEvent: (node, event) {
+              if (event is KeyDownEvent && _isSelectKey(event.logicalKey)) {
+                _browse();
+                return KeyEventResult.handled;
+              }
+              return KeyEventResult.ignored;
+            },
+            child: GestureDetector(
+              onTap: _browse,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 22,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: _focused ? accent : Colors.transparent,
+                  border: Border.all(color: accent, width: 2),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.explore_outlined,
+                      color: _focused ? Colors.white : accent,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Browse anime',
+                      style: TextStyle(
+                        color: _focused ? Colors.white : accent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
