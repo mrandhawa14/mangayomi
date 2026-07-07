@@ -108,24 +108,24 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
     if (cur == -1) return KeyEventResult.ignored;
     final target = k == LogicalKeyboardKey.arrowDown ? cur + 1 : cur - 1;
     if (target < 0 || target >= _order.length) return KeyEventResult.ignored;
-    _focusSection(_order[target]);
+    // Column-preserving: land on the *same* card index in the target row so
+    // Up/Down keeps your horizontal position instead of snapping to card 1.
+    final curDesc = _order[cur].traversalDescendants.toList();
+    final col = curDesc.indexWhere((n) => n.hasPrimaryFocus);
+    _focusSection(_order[target], col < 0 ? 0 : col);
     return KeyEventResult.handled;
   }
 
-  // Focus a specific *visible* child of a section — its remembered child, else
-  // the first focusable one — so a card/button always shows the focus ring
-  // (requesting focus on the scope itself would leave nothing highlighted).
-  void _focusSection(FocusScopeNode scope) {
-    if (scope.focusedChild != null) {
-      scope.focusedChild!.requestFocus();
+  // Focus the card at [column] in a section (clamped) — always a visible child,
+  // so a card/button shows the focus ring and the horizontal position carries
+  // over between rows.
+  void _focusSection(FocusScopeNode scope, int column) {
+    final descendants = scope.traversalDescendants.toList();
+    if (descendants.isEmpty) {
+      scope.requestFocus();
       return;
     }
-    final descendants = scope.traversalDescendants;
-    if (descendants.isNotEmpty) {
-      descendants.first.requestFocus();
-    } else {
-      scope.requestFocus();
-    }
+    descendants[column.clamp(0, descendants.length - 1)].requestFocus();
   }
 
   @override
@@ -314,11 +314,35 @@ class _TvHomeTopBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: controller,
-              onChanged: onChanged,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
+            // The text field owns Left/Right for the cursor; let Right escape to
+            // the size button once the cursor is at the end of the text.
+            child: Focus(
+              canRequestFocus: false,
+              skipTraversal: true,
+              onKeyEvent: (node, event) {
+                if (event is KeyDownEvent &&
+                    event.logicalKey == LogicalKeyboardKey.arrowRight) {
+                  final sel = controller.selection;
+                  final atEnd =
+                      !sel.isValid ||
+                      sel.baseOffset >= controller.text.length;
+                  if (atEnd) {
+                    FocusScope.of(
+                      context,
+                    ).focusInDirection(TraversalDirection.right);
+                    return KeyEventResult.handled;
+                  }
+                }
+                return KeyEventResult.ignored;
+              },
+              child: TextField(
+                controller: controller,
+                onChanged: onChanged,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => FocusScope.of(
+                  context,
+                ).focusInDirection(TraversalDirection.down),
+                decoration: InputDecoration(
                 isDense: true,
                 filled: true,
                 hintText: 'Search your anime',
@@ -340,6 +364,7 @@ class _TvHomeTopBar extends StatelessWidget {
                   borderSide: BorderSide.none,
                 ),
               ),
+            ),
             ),
           ),
           const SizedBox(width: 12),
