@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 class CoverViewWidget extends StatefulWidget {
   final List<Widget> children;
@@ -58,16 +59,23 @@ class _CoverViewWidgetState extends State<CoverViewWidget> {
   }
 
   void _onHighlightModeChanged(FocusHighlightMode mode) {
-    if (mode != FocusHighlightMode.traditional && _focused) {
+    // On TV the ring must persist regardless of highlight mode (input is d-pad
+    // only); elsewhere drop it the moment input switches away from keyboard.
+    if (!isTv && mode != FocusHighlightMode.traditional && _focused) {
       setState(() => _focused = false);
     }
   }
 
   void _onFocusChange(bool hasFocus) {
     widget.onFocusChange?.call(hasFocus);
+    // On TV always show the ring when focused so something is always visibly
+    // focused; elsewhere only for keyboard/d-pad (traditional) so touch input
+    // never shows it.
     final show =
         hasFocus &&
-        FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
+        (isTv ||
+            FocusManager.instance.highlightMode ==
+                FocusHighlightMode.traditional);
     if (mounted && show != _focused) {
       setState(() => _focused = show);
     }

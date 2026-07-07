@@ -88,8 +88,24 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
     if (cur == -1) return KeyEventResult.ignored;
     final target = k == LogicalKeyboardKey.arrowDown ? cur + 1 : cur - 1;
     if (target < 0 || target >= _order.length) return KeyEventResult.ignored;
-    _order[target].requestFocus();
+    _focusSection(_order[target]);
     return KeyEventResult.handled;
+  }
+
+  // Focus a specific *visible* child of a section — its remembered child, else
+  // the first focusable one — so a card/button always shows the focus ring
+  // (requesting focus on the scope itself would leave nothing highlighted).
+  void _focusSection(FocusScopeNode scope) {
+    if (scope.focusedChild != null) {
+      scope.focusedChild!.requestFocus();
+      return;
+    }
+    final descendants = scope.traversalDescendants;
+    if (descendants.isNotEmpty) {
+      descendants.first.requestFocus();
+    } else {
+      scope.requestFocus();
+    }
   }
 
   @override
