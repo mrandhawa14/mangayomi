@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -189,9 +190,9 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                 );
           final recent = [...allAnime]
             ..sort((a, b) => (b.dateAdded ?? 0).compareTo(a.dateAdded ?? 0));
-          final hero = continueList.isNotEmpty
-              ? continueList.first
-              : recent.first;
+          final heroItems = (continueList.isNotEmpty ? continueList : recent)
+              .take(6)
+              .toList();
           final cats =
               (catsAsync.asData?.value ?? const <Category>[])
                   .where((c) => !(c.hide ?? false))
@@ -226,7 +227,7 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
           } else if (selectedId == null) {
             order.add(_scopeHero);
             final rows = <Widget>[
-              FocusScope(node: _scopeHero, child: _TvHomeHero(manga: hero)),
+              FocusScope(node: _scopeHero, child: _TvHomeHero(items: heroItems)),
             ];
             var ri = 0;
             void addRow(String title, List<Manga> items) {
@@ -454,8 +455,68 @@ class _MangaGrid extends ConsumerWidget {
 /// The top hero: a blurred cover backdrop (clipped so it can't bleed into the
 /// rows), darkened on the left for text and faded into the page background at
 /// the bottom for a clean seam. Poster + title + the autofocused Continue.
-class _TvHomeHero extends ConsumerWidget {
-  const _TvHomeHero({required this.manga});
+/// Auto-rotating hero — cycles through the top few resume candidates with a
+/// crossfade, pausing while it (its Continue button) is focused.
+class _TvHomeHero extends StatefulWidget {
+  const _TvHomeHero({required this.items});
+  final List<Manga> items;
+
+  @override
+  State<_TvHomeHero> createState() => _TvHomeHeroState();
+}
+
+class _TvHomeHeroState extends State<_TvHomeHero> {
+  int _index = 0;
+  Timer? _timer;
+  bool _paused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restart();
+  }
+
+  void _restart() {
+    _timer?.cancel();
+    if (widget.items.length <= 1) return;
+    _timer = Timer.periodic(const Duration(seconds: 7), (_) {
+      if (_paused || !mounted) return;
+      setState(() => _index = (_index + 1) % widget.items.length);
+    });
+  }
+
+  @override
+  void didUpdateWidget(_TvHomeHero old) {
+    super.didUpdateWidget(old);
+    if (_index >= widget.items.length) _index = 0;
+    if (old.items.length != widget.items.length) _restart();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.items.isEmpty) return const SizedBox.shrink();
+    final manga = widget.items[_index.clamp(0, widget.items.length - 1)];
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      // Pause rotation while the hero (its Continue button) is focused.
+      onFocusChange: (f) => _paused = f,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 500),
+        child: _HeroContent(key: ValueKey(manga.id), manga: manga),
+      ),
+    );
+  }
+}
+
+class _HeroContent extends ConsumerWidget {
+  const _HeroContent({required this.manga, super.key});
   final Manga manga;
 
   @override
