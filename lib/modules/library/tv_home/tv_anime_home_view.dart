@@ -17,6 +17,7 @@ import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/more/categories/providers/isar_providers.dart';
 import 'package:mangayomi/modules/more/categories/widgets/custom_textfield.dart';
 import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
+import 'package:mangayomi/modules/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
@@ -229,6 +230,7 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
             ];
             var ri = 0;
             void addRow(String title, List<Manga> items) {
+              if (ri >= _scopeRows.length) return; // scope pool exhausted
               final scope = _scopeRows[ri++];
               order.add(scope);
               rows.add(
@@ -244,6 +246,21 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
             }
             if (newEpisodes.isNotEmpty) addRow('New Episodes', newEpisodes);
             addRow('Recently Added', recent);
+
+            // Genre rows — browse the library by genre (top few, ≥3 titles).
+            final byGenre = <String, List<Manga>>{};
+            for (final m in allAnime) {
+              for (final g in (m.genre ?? const <String>[])) {
+                final t = g.trim();
+                if (t.isNotEmpty) (byGenre[t] ??= <Manga>[]).add(m);
+              }
+            }
+            final genreRows =
+                byGenre.entries.where((e) => e.value.length >= 3).toList()
+                  ..sort((a, b) => b.value.length.compareTo(a.value.length));
+            for (final g in genreRows.take(6)) {
+              addRow(g.key, g.value);
+            }
             content = ListView(
               padding: const EdgeInsets.only(bottom: 28),
               children: rows,
@@ -395,6 +412,7 @@ class _MangaGrid extends ConsumerWidget {
     }
     final width = _cardWidthFor(ref.watch(tvHomeCardScaleProvider));
     return GridView.builder(
+      clipBehavior: Clip.none,
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
       gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: width + 10,
@@ -419,21 +437,29 @@ class _TvHomeHero extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final image = resolveCoverImage(manga, ref);
     final bg = Theme.of(context).scaffoldBackgroundColor;
+    final total = manga.chapters.length;
+    final read = manga.chapters.where((c) => c.isRead ?? false).length;
     final unread = manga.chapters.where((c) => !(c.isRead ?? true)).length;
     final resume = _resumeChapter(manga);
-
-    // Progress within the resume episode. Position (lastPageRead, ms) is always
-    // stored; a total (duration) may not be — only draw the bar when we have it.
     final posMs = int.tryParse(resume?.lastPageRead ?? '') ?? 0;
-    final durMs = int.tryParse(resume?.duration ?? '') ?? 0;
-    final hasBar = posMs > 0 && durMs > posMs;
+
+    // Series progress = watched / total (episode duration isn't reliably
+    // stored, so within-episode % isn't available).
+    final progress = (total > 0 && read > 0 && read < total)
+        ? read / total
+        : 0.0;
+    final hasBar = progress > 0;
 
     final metaBits = <String>[
       if ((resume?.name ?? '').isNotEmpty) resume!.name!,
+      if (posMs > 0) 'at ${_fmtMs(posMs)}',
       if (unread > 0) '$unread new',
-      if (!hasBar && posMs > 0) 'at ${_fmtMs(posMs)}',
       if ((manga.source ?? '').isNotEmpty) manga.source!,
     ];
+    final genreBits = (manga.genre ?? const <String>[])
+        .where((g) => g.trim().isNotEmpty)
+        .take(3)
+        .toList();
 
     return ClipRect(
       child: SizedBox(
@@ -508,6 +534,18 @@ class _TvHomeHero extends ConsumerWidget {
                             ),
                           ),
                         ],
+                        if (genreBits.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            genreBits.join('  ·  '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.55),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                         if (hasBar) ...[
                           const SizedBox(height: 12),
                           Row(
@@ -516,7 +554,7 @@ class _TvHomeHero extends ConsumerWidget {
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(3),
                                   child: LinearProgressIndicator(
-                                    value: posMs / durMs,
+                                    value: progress,
                                     minHeight: 5,
                                     backgroundColor: Colors.white24,
                                     valueColor: AlwaysStoppedAnimation<Color>(
@@ -527,7 +565,7 @@ class _TvHomeHero extends ConsumerWidget {
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                '${_fmtMs(posMs)} / ${_fmtMs(durMs)}',
+                                '$read / $total',
                                 style: const TextStyle(
                                   color: Colors.white70,
                                   fontSize: 12,
@@ -612,7 +650,10 @@ class _HeroContinueButtonState extends State<_HeroContinueButton> {
       child: GestureDetector(
         onTap: _resume,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
+          duration: const Duration(milliseconds: 130),
+          curve: Curves.easeOut,
+          transform: Matrix4.identity()..scale(_focused ? 1.05 : 1.0),
+          transformAlignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
@@ -671,6 +712,7 @@ class _TvHomeRow extends ConsumerWidget {
             child: FocusTraversalGroup(
               child: SuperListView.builder(
                 scrollDirection: Axis.horizontal,
+                clipBehavior: Clip.none,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: items.length,
                 itemBuilder: (context, index) => SizedBox(
@@ -832,7 +874,10 @@ class _PillState extends State<_Pill> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
+          duration: const Duration(milliseconds: 130),
+          curve: Curves.easeOut,
+          transform: Matrix4.identity()..scale(_focused ? 1.08 : 1.0),
+          transformAlignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
@@ -921,10 +966,18 @@ class _TvHomeCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final total = manga.chapters.length;
+    final read = manga.chapters.where((c) => c.isRead ?? false).length;
     final unread = manga.chapters.where((c) => !(c.isRead ?? true)).length;
+    // Series progress = episodes watched / total (episode duration isn't
+    // reliably stored, so within-episode progress isn't available).
+    final progress = (total > 0 && read > 0 && read < total)
+        ? read / total
+        : 0.0;
     final source = manga.source ?? '';
     return CoverViewWidget(
       isComfortableGrid: true,
+      progress: progress,
       bottomTextWidget: BottomTextWidget(
         text: manga.name ?? '',
         maxLines: 1,
@@ -948,6 +1001,13 @@ class _TvHomeCard extends ConsumerWidget {
         ref: ref,
         context: context,
         entry: manga,
+      ),
+      // Long-press (hold OK on a remote) → assign this title to categories.
+      onLongPress: () => showCategorySelectionDialog(
+        context: context,
+        ref: ref,
+        itemType: ItemType.anime,
+        singleManga: manga,
       ),
       children: [
         if (unread > 0)
