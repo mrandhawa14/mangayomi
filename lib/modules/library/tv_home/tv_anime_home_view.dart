@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/category.dart';
+import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/update.dart';
@@ -28,6 +29,24 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 const List<double> _cardWidths = [110, 128, 150];
 double _cardWidthFor(int s) => _cardWidths[s.clamp(0, _cardWidths.length - 1)];
 double _rowHeightFor(int s) => _cardWidthFor(s) * 1.66;
+
+/// The episode to resume for [manga] — the last from watch history, else the
+/// first chapter.
+Chapter? _resumeChapter(Manga manga) {
+  final history = isar.historys.filter().mangaIdEqualTo(manga.id!).findAllSync();
+  if (history.isNotEmpty) {
+    history.first.chapter.loadSync();
+    final ch = history.first.chapter.value;
+    if (ch != null) return ch;
+  }
+  return manga.chapters.isNotEmpty ? manga.chapters.first : null;
+}
+
+String _fmtMs(int ms) {
+  final d = Duration(milliseconds: ms);
+  final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+  return '${d.inMinutes}:$s';
+}
 
 /// TV-only, d-pad-first anime home. A hero (the thing you'll resume) plus
 /// horizontal rows — Continue Watching (from history), New Episodes (from the
@@ -401,14 +420,24 @@ class _TvHomeHero extends ConsumerWidget {
     final image = resolveCoverImage(manga, ref);
     final bg = Theme.of(context).scaffoldBackgroundColor;
     final unread = manga.chapters.where((c) => !(c.isRead ?? true)).length;
-    final bits = <String>[
+    final resume = _resumeChapter(manga);
+
+    // Progress within the resume episode. Position (lastPageRead, ms) is always
+    // stored; a total (duration) may not be — only draw the bar when we have it.
+    final posMs = int.tryParse(resume?.lastPageRead ?? '') ?? 0;
+    final durMs = int.tryParse(resume?.duration ?? '') ?? 0;
+    final hasBar = posMs > 0 && durMs > posMs;
+
+    final metaBits = <String>[
+      if ((resume?.name ?? '').isNotEmpty) resume!.name!,
       if (unread > 0) '$unread new',
+      if (!hasBar && posMs > 0) 'at ${_fmtMs(posMs)}',
       if ((manga.source ?? '').isNotEmpty) manga.source!,
     ];
 
     return ClipRect(
       child: SizedBox(
-        height: 300,
+        height: 330,
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -426,20 +455,20 @@ class _TvHomeHero extends ConsumerWidget {
                 ),
               ),
             ),
-            // Fade the bottom into the page background so the hero blends into
-            // the first row instead of a hard/bleeding edge.
+            // Fade BOTH the top and bottom into the page background so the hero
+            // blends in from above and below (no sharp seams).
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  stops: const [0.68, 1.0],
-                  colors: [Colors.transparent, bg],
+                  stops: const [0.0, 0.2, 0.75, 1.0],
+                  colors: [bg, Colors.transparent, Colors.transparent, bg],
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(28, 22, 28, 26),
+              padding: const EdgeInsets.fromLTRB(28, 26, 40, 28),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -450,15 +479,16 @@ class _TvHomeHero extends ConsumerWidget {
                       child: Image(image: image, fit: BoxFit.cover),
                     ),
                   ),
-                  const SizedBox(width: 22),
+                  const SizedBox(width: 24),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           manga.name ?? '',
-                          maxLines: 2,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
@@ -466,18 +496,61 @@ class _TvHomeHero extends ConsumerWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        if (bits.isNotEmpty) ...[
-                          const SizedBox(height: 8),
+                        if (metaBits.isNotEmpty) ...[
+                          const SizedBox(height: 6),
                           Text(
-                            bits.join('  ·  '),
+                            metaBits.join('  ·  '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.75),
+                              color: Colors.white.withValues(alpha: 0.78),
                               fontSize: 14,
                             ),
                           ),
                         ],
-                        const SizedBox(height: 18),
-                        _HeroContinueButton(manga: manga),
+                        if (hasBar) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(3),
+                                  child: LinearProgressIndicator(
+                                    value: posMs / durMs,
+                                    minHeight: 5,
+                                    backgroundColor: Colors.white24,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      context.primaryColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                '${_fmtMs(posMs)} / ${_fmtMs(durMs)}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if ((manga.description ?? '').trim().isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            manga.description!.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.72),
+                              fontSize: 13,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        _HeroContinueButton(manga: manga, chapter: resume),
                       ],
                     ),
                   ),
@@ -494,8 +567,9 @@ class _TvHomeHero extends ConsumerWidget {
 /// The hero's Continue button — focusable, autofocused (the home's landing
 /// target), theme-accent when focused, OK/Select or tap to resume.
 class _HeroContinueButton extends StatefulWidget {
-  const _HeroContinueButton({required this.manga});
+  const _HeroContinueButton({required this.manga, this.chapter});
   final Manga manga;
+  final Chapter? chapter;
 
   @override
   State<_HeroContinueButton> createState() => _HeroContinueButtonState();
@@ -505,23 +579,7 @@ class _HeroContinueButtonState extends State<_HeroContinueButton> {
   bool _focused = false;
 
   void _resume() {
-    final history = isar.historys
-        .filter()
-        .mangaIdEqualTo(widget.manga.id!)
-        .findAllSync();
-    if (history.isNotEmpty) {
-      // findAllSync doesn't hydrate the linked chapter — load it explicitly so
-      // Continue resumes the last-watched episode instead of restarting at #1.
-      final last = history.first;
-      last.chapter.loadSync();
-      if (last.chapter.value != null) {
-        last.chapter.value!.pushToReaderView(context);
-        return;
-      }
-    }
-    if (widget.manga.chapters.isNotEmpty) {
-      widget.manga.chapters.first.pushToReaderView(context);
-    }
+    (widget.chapter ?? _resumeChapter(widget.manga))?.pushToReaderView(context);
   }
 
   @override
