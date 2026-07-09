@@ -170,19 +170,11 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
     if (target < 0 || target >= _order.length) return KeyEventResult.ignored;
     // Column-preserving: land on the *same* card index in the target row so
     // Up/Down keeps your horizontal position instead of snapping to card 1.
-    // The grid section is the exception — it's compound (hero, rail, grid), so
-    // a column carried in from the pills would land mid-rail, not on the hero.
-    final int col;
-    if (identical(_order[target], _scopeGrid)) {
-      col = 0;
-    } else {
-      final curDesc = _order[cur].traversalDescendants.toList();
-      final i = curDesc.indexWhere((n) => n.hasPrimaryFocus);
-      col = i < 0 ? 0 : i;
-    }
+    final curDesc = _order[cur].traversalDescendants.toList();
+    final col = curDesc.indexWhere((n) => n.hasPrimaryFocus);
     // If the target has nothing focusable (e.g. a category you just created and
     // haven't filled yet), stay put rather than dropping focus into a void.
-    _focusSection(_order[target], col);
+    _focusSection(_order[target], col < 0 ? 0 : col);
     return KeyEventResult.handled;
   }
 
@@ -467,48 +459,65 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                 .take(6)
                 .toList();
 
-            order.add(_scopeGrid);
-            content = FocusScope(
-              node: _scopeGrid,
-              child: inCat.isEmpty
-                  ? _MangaGrid(
-                      items: inCat,
-                      emptyLabel:
-                          'No anime in this category yet.\n'
-                          'Add titles to it from a title’s detail page.',
-                    )
-                  // One scroll view, not a pinned hero over a boxed grid: a
-                  // 330px hero would leave the grid a sliver of the screen.
-                  // Hero, rail and grid share `_scopeGrid`, so Up/Down inside
-                  // them is plain geometric focus and only the top edge hands
-                  // back to the pills.
-                  : CustomScrollView(
-                      slivers: [
-                        SliverToBoxAdapter(child: _TvHomeHero(items: catHero)),
-                        if (catContinue.isNotEmpty)
-                          SliverToBoxAdapter(
-                            child: _TvHomeRow(
-                              title: 'Continue Watching',
-                              items: catContinue,
-                            ),
-                          ),
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(22, 16, 22, 8),
-                            child: Text(
-                              catName ?? '',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // The grid keeps the sheet's sort order.
-                        _MangaSliverGrid(items: inCat),
-                      ],
+            if (inCat.isEmpty) {
+              order.add(_scopeGrid);
+              content = FocusScope(
+                node: _scopeGrid,
+                child: _MangaGrid(
+                  items: inCat,
+                  emptyLabel:
+                      'No anime in this category yet.\n'
+                      'Add titles to it from a title’s detail page.',
+                ),
+              );
+            } else {
+              // NestedScrollView, not a CustomScrollView: the hero and rail
+              // still scroll away, but the grid stays a real (lazy) box widget,
+              // so each part can own a FocusScope — a scope can't wrap a sliver.
+              // That keeps every section on `_handleVertical`'s column-preserving
+              // navigation instead of Flutter's geometric focus, which snaps to
+              // the first card whenever the rows don't line up.
+              order.add(_scopeHero);
+              if (catContinue.isNotEmpty) order.add(_scopeRows[0]);
+              order.add(_scopeGrid);
+              content = NestedScrollView(
+                headerSliverBuilder: (context, _) => [
+                  SliverToBoxAdapter(
+                    child: FocusScope(
+                      node: _scopeHero,
+                      child: _TvHomeHero(items: catHero),
                     ),
-            );
+                  ),
+                  if (catContinue.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: FocusScope(
+                        node: _scopeRows[0],
+                        child: _TvHomeRow(
+                          title: 'Continue Watching',
+                          items: catContinue,
+                        ),
+                      ),
+                    ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(22, 16, 22, 8),
+                      child: Text(
+                        catName ?? '',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                // The grid keeps the sheet's sort order.
+                body: FocusScope(
+                  node: _scopeGrid,
+                  child: _MangaGrid(items: inCat),
+                ),
+              );
+            }
           }
           _order = order;
 
@@ -691,8 +700,10 @@ class _LibrarySettingsButtonState extends ConsumerState<_LibrarySettingsButton>
 /// Flat grid of a Manga list (leaf view — a plain grid navigates predictably).
 /// Shared by search results and a selected category.
 class _MangaGrid extends ConsumerWidget {
-  const _MangaGrid({required this.items, required this.emptyLabel});
+  const _MangaGrid({required this.items, this.emptyLabel = ''});
   final List<Manga> items;
+
+  /// Only reachable where [items] can legitimately be empty.
   final String emptyLabel;
 
   @override
@@ -711,28 +722,6 @@ class _MangaGrid extends ConsumerWidget {
       gridDelegate: _gridDelegate(_gridSize(ref)),
       itemCount: items.length,
       itemBuilder: (context, index) => _TvHomeCard(manga: items[index]),
-    );
-  }
-}
-
-/// The same grid as [_MangaGrid], as a sliver, so a category can scroll its
-/// hero and Continue rail away above it.
-class _MangaSliverGrid extends ConsumerWidget {
-  const _MangaSliverGrid({required this.items});
-
-  final List<Manga> items;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-      sliver: SliverGrid(
-        gridDelegate: _gridDelegate(_gridSize(ref)),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) => _TvHomeCard(manga: items[index]),
-          childCount: items.length,
-        ),
-      ),
     );
   }
 }
