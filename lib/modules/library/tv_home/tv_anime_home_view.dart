@@ -159,7 +159,27 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
         loading: () => const ProgressCenter(),
         error: (e, _) => ErrorText(e),
         data: (allAnime) {
-          if (allAnime.isEmpty) return const _EmptyHome();
+          // A hidden category hides its entries, matching the library (a hidden
+          // category has no tab, and its titles aren't "Default" either). A
+          // title stays visible if it's uncategorised, or sits in at least one
+          // non-hidden category.
+          final allCats = catsAsync.asData?.value ?? const <Category>[];
+          final hiddenCatIds = allCats
+              .where((c) => c.hide ?? false)
+              .map((c) => c.id)
+              .whereType<int>()
+              .toSet();
+          final cats = allCats.where((c) => !(c.hide ?? false)).toList()
+            ..sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0));
+          final visible = hiddenCatIds.isEmpty
+              ? allAnime
+              : allAnime.where((m) {
+                  final mc = m.categories ?? const <int>[];
+                  return mc.isEmpty ||
+                      mc.any((id) => !hiddenCatIds.contains(id));
+                }).toList();
+
+          if (visible.isEmpty) return const _EmptyHome();
 
           // Continue Watching = every anime you've actually played, from watch
           // history, most-recently-watched first.
@@ -191,10 +211,10 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                   .toSet();
 
           final continueList =
-              allAnime.where((m) => historyIds.contains(m.id)).toList()
+              visible.where((m) => historyIds.contains(m.id)).toList()
                 ..sort((a, b) => (b.lastRead ?? 0).compareTo(a.lastRead ?? 0));
           final newEpisodes =
-              allAnime
+              visible
                   .where(
                     (m) =>
                         updatedIds.contains(m.id) &&
@@ -204,16 +224,11 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                 ..sort(
                   (a, b) => (b.lastUpdate ?? 0).compareTo(a.lastUpdate ?? 0),
                 );
-          final recent = [...allAnime]
+          final recent = [...visible]
             ..sort((a, b) => (b.dateAdded ?? 0).compareTo(a.dateAdded ?? 0));
           final heroItems = (continueList.isNotEmpty ? continueList : recent)
               .take(6)
               .toList();
-          final cats =
-              (catsAsync.asData?.value ?? const <Category>[])
-                  .where((c) => !(c.hide ?? false))
-                  .toList()
-                ..sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0));
 
           // If the selected category was removed, fall back to All.
           final selectedId =
@@ -231,7 +246,7 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
           Widget content;
           if (searching) {
             final matches =
-                allAnime
+                visible
                     .where((m) => (m.name ?? '').toLowerCase().contains(q))
                     .toList()
                   ..sort(
@@ -273,7 +288,7 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
 
             // Genre rows — browse the library by genre (top few, ≥3 titles).
             final byGenre = <String, List<Manga>>{};
-            for (final m in allAnime) {
+            for (final m in visible) {
               for (final g in (m.genre ?? const <String>[])) {
                 final t = g.trim();
                 if (t.isNotEmpty) (byGenre[t] ??= <Manga>[]).add(m);
@@ -298,7 +313,7 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                   orElse: () => cats.first,
                 )
                 .name;
-            final inCat = allAnime
+            final inCat = visible
                 .where(
                   (m) => (m.categories ?? const <int>[]).contains(selectedId),
                 )
