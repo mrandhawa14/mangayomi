@@ -290,10 +290,71 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
               children: rows,
             );
           } else {
+            // Category view: a Continue Watching row scoped to *this* category,
+            // then the category's full grid.
+            final catName = cats
+                .firstWhere(
+                  (c) => c.id == selectedId,
+                  orElse: () => cats.first,
+                )
+                .name;
+            final inCat = allAnime
+                .where(
+                  (m) => (m.categories ?? const <int>[]).contains(selectedId),
+                )
+                .toList();
+            final catContinue =
+                inCat.where((m) => historyIds.contains(m.id)).toList()
+                  ..sort(
+                    (a, b) => (b.lastRead ?? 0).compareTo(a.lastRead ?? 0),
+                  );
+            final catAll = [...inCat]
+              ..sort((a, b) => (b.dateAdded ?? 0).compareTo(a.dateAdded ?? 0));
+
+            final parts = <Widget>[];
+            if (catContinue.isNotEmpty) {
+              order.add(_scopeRows[0]);
+              parts.add(
+                FocusScope(
+                  node: _scopeRows[0],
+                  child: _TvHomeRow(
+                    title: 'Continue Watching',
+                    items: catContinue,
+                  ),
+                ),
+              );
+            }
+            if (catAll.isNotEmpty) {
+              parts.add(
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 16, 22, 8),
+                  child: Text(
+                    catName ?? '',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              );
+            }
             order.add(_scopeGrid);
-            content = FocusScope(
-              node: _scopeGrid,
-              child: _CategoryGrid(categoryId: selectedId!),
+            parts.add(
+              Expanded(
+                child: FocusScope(
+                  node: _scopeGrid,
+                  child: _MangaGrid(
+                    items: catAll,
+                    emptyLabel:
+                        'No anime in this category yet.\n'
+                        'Add titles to it from a title’s detail page.',
+                  ),
+                ),
+              ),
+            );
+            content = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: parts,
             );
           }
           _order = order;
@@ -914,33 +975,6 @@ class _TvHomeRow extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// A selected category's grid — watches its membership stream.
-class _CategoryGrid extends ConsumerWidget {
-  const _CategoryGrid({required this.categoryId});
-  final int categoryId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final items =
-        ref
-            .watch(
-              getAllMangaStreamProvider(
-                categoryId: categoryId,
-                itemType: ItemType.anime,
-              ),
-            )
-            .asData
-            ?.value ??
-        const <Manga>[];
-    return _MangaGrid(
-      items: items,
-      emptyLabel:
-          'No anime in this category yet.\n'
-          'Add titles to it from a title’s detail page.',
     );
   }
 }
