@@ -369,13 +369,36 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
               ),
             );
           } else if (searching) {
-            // `entries` already has the query applied, in the sheet's sort order.
+            // `entries` already has the query applied, in the sheet's sort
+            // order. A selected pill scopes the search to that category, the
+            // way searching inside a category tab does everywhere else — the
+            // library searches `getAllMangaStreamProvider(categoryId:)`, not
+            // the whole library.
+            final catName = selectedId == null
+                ? null
+                : cats
+                      .firstWhere(
+                        (c) => c.id == selectedId,
+                        orElse: () => cats.first,
+                      )
+                      .name;
+            final matches = selectedId == null
+                ? entries
+                : entries
+                      .where(
+                        (m) => (m.categories ?? const <int>[]).contains(
+                          selectedId,
+                        ),
+                      )
+                      .toList();
             order.add(_scopeGrid);
             content = FocusScope(
               node: _scopeGrid,
               child: _MangaGrid(
-                items: entries,
-                emptyLabel: 'No matching anime',
+                items: matches,
+                emptyLabel: catName == null
+                    ? 'No matching anime'
+                    : 'No matching anime in “$catName”',
               ),
             );
           } else if (entries.isEmpty) {
