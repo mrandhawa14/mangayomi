@@ -84,9 +84,6 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
   // only hands off to the pills at its top edge.
   final _scopeGrid = FocusScopeNode(debugLabel: 'tvHomeGrid');
   List<FocusScopeNode> _order = const [];
-  // Kept from the last build so the Menu key can raise the hidden-category
-  // list from anywhere on the screen, without a chip advertising it.
-  List<Category> _hiddenCats = const [];
 
   @override
   void dispose() {
@@ -109,13 +106,6 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
       return KeyEventResult.ignored;
     }
     final k = event.logicalKey;
-    // The remote's Menu button (☰) is the way into the hidden categories. It
-    // does nothing else on this screen, and unlike OK it can't be held, so the
-    // dialog it opens never inherits the rest of the press.
-    if (k == LogicalKeyboardKey.contextMenu && event is KeyDownEvent) {
-      _showHiddenCategoriesDialog(context, _hiddenCats);
-      return KeyEventResult.handled;
-    }
     if (k != LogicalKeyboardKey.arrowDown && k != LogicalKeyboardKey.arrowUp) {
       return KeyEventResult.ignored;
     }
@@ -181,7 +171,6 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
               .map((c) => c.id)
               .whereType<int>()
               .toSet();
-          _hiddenCats = hiddenCats;
           final cats = allCats.where((c) => !(c.hide ?? false)).toList()
             ..sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0));
           final visible = hiddenCatIds.isEmpty
@@ -266,7 +255,7 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                 padding: const EdgeInsets.all(24),
                 child: Text(
                   'Every title sits in a hidden category.\n'
-                  'Press Menu, or hold OK on “All”, to unhide one.',
+                  'Hold OK on “All” to unhide one.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Theme.of(context).hintColor),
                 ),
@@ -1066,7 +1055,7 @@ class _CategoryPillsState extends State<_CategoryPills> {
     isar.writeTxnSync(() => isar.categorys.putSync(category..hide = true));
     if (widget.selected == category.id) widget.onSelect(null);
     _focusAll();
-    botToast('Hid “${category.name}” · press Menu or hold OK on All to unhide');
+    botToast('Hid “${category.name}” · hold OK on “All” to unhide');
   }
 
   @override
@@ -1091,6 +1080,8 @@ class _CategoryPillsState extends State<_CategoryPills> {
                     autofocus: true,
                     onTap: () => widget.onSelect(null),
                     onLongPress: () =>
+                        _showHiddenCategoriesDialog(context, widget.hidden),
+                    onMenu: () =>
                         _showHiddenCategoriesDialog(context, widget.hidden),
                   ),
                   for (final c in widget.categories)
@@ -1129,6 +1120,7 @@ class _Pill extends StatefulWidget {
     required this.label,
     required this.onTap,
     this.onLongPress,
+    this.onMenu,
     this.icon,
     this.focusNode,
     this.selected = false,
@@ -1141,6 +1133,11 @@ class _Pill extends StatefulWidget {
   final bool autofocus;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+
+  /// Handled only while this pill has focus, so the remote's Menu button stays
+  /// free everywhere else — it reads as "options for the focused item", which
+  /// a cover will want.
+  final VoidCallback? onMenu;
 
   @override
   State<_Pill> createState() => _PillState();
@@ -1178,6 +1175,13 @@ class _PillState extends State<_Pill> {
         }
       },
       onKeyEvent: (node, event) {
+        final onMenu = widget.onMenu;
+        if (onMenu != null &&
+            event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.contextMenu) {
+          onMenu();
+          return KeyEventResult.handled;
+        }
         if (!_isSelectKey(event.logicalKey)) return KeyEventResult.ignored;
         // A remote reports a held OK as key *repeats*, never as a pointer
         // long-press. Both tap and hold resolve on release, so whatever a hold
@@ -1243,7 +1247,8 @@ class _PillState extends State<_Pill> {
 /// inline from the home.
 /// Has no chip, no icon, nothing on screen: a visible "Hidden" affordance would
 /// advertise the categories the user hid, which is most of what hiding is for.
-/// Reached with the remote's Menu button, or by holding OK on the "All" pill.
+/// Reached from the "All" pill — hold OK on it, or press Menu while it's
+/// focused. Hiding leaves focus there, so the toast can name the way back.
 void _showHiddenCategoriesDialog(BuildContext context, List<Category> hidden) {
   if (hidden.isEmpty) {
     botToast('No hidden categories');
