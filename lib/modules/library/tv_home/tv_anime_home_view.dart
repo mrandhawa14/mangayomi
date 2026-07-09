@@ -415,18 +415,22 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
             addRow('Recently Added', recent);
 
             // Genre rows — browse the library by genre (top few, ≥3 titles).
-            final byGenre = <String, List<Manga>>{};
-            for (final m in entries) {
-              for (final g in (m.genre ?? const <String>[])) {
-                final t = g.trim();
-                if (t.isNotEmpty) (byGenre[t] ??= <Manga>[]).add(m);
+            // The one place a title can appear in more than one row, so they're
+            // switchable from the filter/sort/display sheet.
+            if (ref.watch(tvHomeGenreRowsProvider)) {
+              final byGenre = <String, List<Manga>>{};
+              for (final m in entries) {
+                for (final g in (m.genre ?? const <String>[])) {
+                  final t = g.trim();
+                  if (t.isNotEmpty) (byGenre[t] ??= <Manga>[]).add(m);
+                }
               }
-            }
-            final genreRows =
-                byGenre.entries.where((e) => e.value.length >= 3).toList()
-                  ..sort((a, b) => b.value.length.compareTo(a.value.length));
-            for (final g in genreRows.take(6)) {
-              addRow(g.key, g.value);
+              final genreRows =
+                  byGenre.entries.where((e) => e.value.length >= 3).toList()
+                    ..sort((a, b) => b.value.length.compareTo(a.value.length));
+              for (final g in genreRows.take(6)) {
+                addRow(g.key, g.value);
+              }
             }
             content = ListView(
               padding: const EdgeInsets.only(bottom: 28),

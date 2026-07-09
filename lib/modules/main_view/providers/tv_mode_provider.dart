@@ -8,6 +8,7 @@ const _boxName = 'tv_prefs';
 const _overrideKey = 'anime_only_override';
 const _playerStyleKey = 'tv_player_style';
 const _homeStyleKey = 'tv_home_style';
+const _genreRowsKey = 'tv_home_genre_rows';
 const devForceTvKey = 'dev_force_tv';
 
 /// Opens the backing box. Called once at startup.
@@ -91,6 +92,31 @@ class TvHomeStyle extends Notifier<bool> {
     state = value;
     if (Hive.isBoxOpen(_boxName)) {
       Hive.box(_boxName).put(_homeStyleKey, value);
+    }
+  }
+}
+
+/// Whether the TV home shows its genre rows. They're the one place a title can
+/// appear more than once, so anyone who finds that repetitive can switch them
+/// off from the filter/sort/display sheet. On by default.
+final tvHomeGenreRowsProvider = NotifierProvider<TvHomeGenreRows, bool>(
+  TvHomeGenreRows.new,
+);
+
+class TvHomeGenreRows extends Notifier<bool> {
+  @override
+  bool build() {
+    if (Hive.isBoxOpen(_boxName)) {
+      final v = Hive.box(_boxName).get(_genreRowsKey);
+      if (v is bool) return v;
+    }
+    return true;
+  }
+
+  void set(bool value) {
+    state = value;
+    if (Hive.isBoxOpen(_boxName)) {
+      Hive.box(_boxName).put(_genreRowsKey, value);
     }
   }
 }
