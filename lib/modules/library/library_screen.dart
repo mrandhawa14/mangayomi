@@ -97,7 +97,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     if (isTv &&
         widget.itemType == ItemType.anime &&
         ref.watch(tvHomeStyleProvider)) {
-      return const TvAnimeHomeView();
+      return TvAnimeHomeView(settings: settings);
     }
     final categories = ref.watch(
       getMangaCategorieStreamProvider(itemType: widget.itemType),

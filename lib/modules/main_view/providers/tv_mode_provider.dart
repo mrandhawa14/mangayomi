@@ -8,7 +8,6 @@ const _boxName = 'tv_prefs';
 const _overrideKey = 'anime_only_override';
 const _playerStyleKey = 'tv_player_style';
 const _homeStyleKey = 'tv_home_style';
-const _cardScaleKey = 'tv_home_card_scale';
 const devForceTvKey = 'dev_force_tv';
 
 /// Opens the backing box. Called once at startup.
@@ -94,32 +93,6 @@ class TvHomeStyle extends Notifier<bool> {
       Hive.box(_boxName).put(_homeStyleKey, value);
     }
   }
-}
-
-/// Card density for the TV home rows/grid: 0 = compact, 1 = comfortable
-/// (default), 2 = large. Persisted; only used by the TV home.
-final tvHomeCardScaleProvider = NotifierProvider<TvHomeCardScale, int>(
-  TvHomeCardScale.new,
-);
-
-class TvHomeCardScale extends Notifier<int> {
-  @override
-  int build() {
-    if (Hive.isBoxOpen(_boxName)) {
-      final v = Hive.box(_boxName).get(_cardScaleKey);
-      if (v is int) return v;
-    }
-    return 1;
-  }
-
-  void set(int value) {
-    state = value.clamp(0, 2);
-    if (Hive.isBoxOpen(_boxName)) {
-      Hive.box(_boxName).put(_cardScaleKey, state);
-    }
-  }
-
-  void cycle() => set((state + 1) % 3);
 }
 
 /// Dev-only: force TV mode (`isTv`) on any device so the Android TV UI can be

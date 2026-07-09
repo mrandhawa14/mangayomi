@@ -10,13 +10,18 @@ import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/chapter.dart';
 import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/update.dart';
 import 'package:mangayomi/modules/history/providers/isar_providers.dart';
 import 'package:mangayomi/modules/library/providers/isar_providers.dart';
+import 'package:mangayomi/modules/library/providers/library_filter_provider.dart';
+import 'package:mangayomi/modules/library/providers/library_state_provider.dart';
 import 'package:mangayomi/modules/library/widgets/library_entry_utils.dart';
+import 'package:mangayomi/modules/library/widgets/library_settings_sheet.dart';
 import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/more/categories/providers/isar_providers.dart';
 import 'package:mangayomi/modules/more/categories/widgets/custom_textfield.dart';
+import 'package:mangayomi/modules/more/providers/downloaded_only_state_provider.dart';
 import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
 import 'package:mangayomi/modules/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
@@ -28,9 +33,28 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 
 // Poster width per density scale (0 compact · 1 comfortable · 2 large); row
 // height keeps a poster-plus-title aspect.
-const List<double> _cardWidths = [110, 128, 150];
-double _cardWidthFor(int s) => _cardWidths[s.clamp(0, _cardWidths.length - 1)];
-double _rowHeightFor(int s) => _cardWidthFor(s) * 1.66;
+/// Matches `GridViewWidget`'s TV default, so an untouched grid-size setting
+/// looks the same here as in the classic library.
+const double _defaultCardWidth = 150;
+
+/// Card width follows the library's own grid-size setting ("items per row",
+/// 0 = default) — the slider in the filter/sort/display sheet drives the TV
+/// home too, rather than the home keeping a private density of its own.
+double _cardWidth(BuildContext context, int gridSize) {
+  final size = MediaQuery.sizeOf(context);
+  final raw = gridSize <= 0
+      ? _defaultCardWidth
+      : (size.width - 44) / gridSize - 8;
+  // A rail is not a grid: cap the card so "1 per row" can't eat the screen.
+  final cap = ((size.height * 0.5) / 1.66).clamp(120.0, 400.0);
+  return raw.clamp(90.0, cap);
+}
+
+double _rowHeight(BuildContext context, int gridSize) =>
+    _cardWidth(context, gridSize) * 1.66;
+
+int _gridSize(WidgetRef ref) =>
+    ref.watch(libraryGridSizeStateProvider(itemType: ItemType.anime)) ?? 0;
 
 /// The episode to resume for [manga] — the last from watch history, else the
 /// first chapter.
@@ -53,10 +77,12 @@ String _fmtMs(int ms) {
 /// TV-only, d-pad-first anime home. A hero (the thing you'll resume) plus
 /// horizontal rows — Continue Watching (from history), New Episodes (from the
 /// update feed), Recently Added, then one row per category. A top bar adds
-/// search + a card-density control (sort/filter stay in the classic grid).
+/// search and the library's own filter/sort/display sheet.
 /// Rendered only when `isTv` + `tvHomeStyle`.
 class TvAnimeHomeView extends ConsumerStatefulWidget {
-  const TvAnimeHomeView({super.key});
+  const TvAnimeHomeView({super.key, required this.settings});
+
+  final Settings settings;
 
   @override
   ConsumerState<TvAnimeHomeView> createState() => _TvAnimeHomeViewState();
@@ -186,6 +212,71 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
           // OK on "All" is the way back, and _EmptyHome has no "All".
           if (allAnime.isEmpty) return const _EmptyHome();
 
+          // The filter/sort/display sheet is the library's own, so its settings
+          // have to bite here too. Filters and the search box narrow every view;
+          // the sort order drives the grids, while the curated rows keep the
+          // ordering that gives them their meaning (last watched, newest
+          // episode, most recently added).
+          const it = ItemType.anime;
+          final settings = widget.settings;
+          final sortState = ref.watch(
+            sortLibraryMangaStateProvider(itemType: it, settings: settings),
+          );
+          final filtered = ref.watch(
+            filteredLibraryMangaProvider(
+              data: visible,
+              downloadFilterType: ref.watch(
+                mangaFilterDownloadedStateProvider(
+                  itemType: it,
+                  mangaList: visible,
+                  settings: settings,
+                ),
+              ),
+              unreadFilterType: ref.watch(
+                mangaFilterUnreadStateProvider(
+                  itemType: it,
+                  mangaList: visible,
+                  settings: settings,
+                ),
+              ),
+              startedFilterType: ref.watch(
+                mangaFilterStartedStateProvider(
+                  itemType: it,
+                  mangaList: visible,
+                  settings: settings,
+                ),
+              ),
+              bookmarkedFilterType: ref.watch(
+                mangaFilterBookmarkedStateProvider(
+                  itemType: it,
+                  mangaList: visible,
+                  settings: settings,
+                ),
+              ),
+              completedFilterType: ref.watch(
+                mangaFilterCompletedStateProvider(
+                  itemType: it,
+                  mangaList: visible,
+                  settings: settings,
+                ),
+              ),
+              trackingFilterType: ref.watch(
+                mangaFilterTrackingStateProvider(
+                  itemType: it,
+                  mangaList: visible,
+                  settings: settings,
+                ),
+              ),
+              sortType: sortState.index ?? 0,
+              downloadedOnly: ref.watch(downloadedOnlyStateProvider),
+              searchQuery: _query.trim(),
+              ignoreFiltersOnSearch: false,
+            ),
+          );
+          final entries = (sortState.reverse ?? false)
+              ? filtered.reversed.toList()
+              : filtered;
+
           // Continue Watching = every anime you've actually played, from watch
           // history, most-recently-watched first.
           final historyIds =
@@ -216,10 +307,10 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                   .toSet();
 
           final continueList =
-              visible.where((m) => historyIds.contains(m.id)).toList()
+              entries.where((m) => historyIds.contains(m.id)).toList()
                 ..sort((a, b) => (b.lastRead ?? 0).compareTo(a.lastRead ?? 0));
           final newEpisodes =
-              visible
+              entries
                   .where(
                     (m) =>
                         updatedIds.contains(m.id) &&
@@ -229,7 +320,7 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                 ..sort(
                   (a, b) => (b.lastUpdate ?? 0).compareTo(a.lastUpdate ?? 0),
                 );
-          final recent = [...visible]
+          final recent = [...entries]
             ..sort((a, b) => (b.dateAdded ?? 0).compareTo(a.dateAdded ?? 0));
           final heroItems = (continueList.isNotEmpty ? continueList : recent)
               .take(6)
@@ -262,21 +353,25 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
               ),
             );
           } else if (searching) {
-            final matches =
-                visible
-                    .where((m) => (m.name ?? '').toLowerCase().contains(q))
-                    .toList()
-                  ..sort(
-                    (a, b) => (a.name ?? '').toLowerCase().compareTo(
-                      (b.name ?? '').toLowerCase(),
-                    ),
-                  );
+            // `entries` already has the query applied, in the sheet's sort order.
             order.add(_scopeGrid);
             content = FocusScope(
               node: _scopeGrid,
               child: _MangaGrid(
-                items: matches,
+                items: entries,
                 emptyLabel: 'No matching anime',
+              ),
+            );
+          } else if (entries.isEmpty) {
+            content = Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'No anime matches the current filters.\n'
+                  'Change them from the button beside search.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Theme.of(context).hintColor),
+                ),
               ),
             );
           } else if (selectedId == null) {
@@ -305,7 +400,7 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
 
             // Genre rows — browse the library by genre (top few, ≥3 titles).
             final byGenre = <String, List<Manga>>{};
-            for (final m in visible) {
+            for (final m in entries) {
               for (final g in (m.genre ?? const <String>[])) {
                 final t = g.trim();
                 if (t.isNotEmpty) (byGenre[t] ??= <Manga>[]).add(m);
@@ -330,7 +425,7 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                   orElse: () => cats.first,
                 )
                 .name;
-            final inCat = visible
+            final inCat = entries
                 .where(
                   (m) => (m.categories ?? const <int>[]).contains(selectedId),
                 )
@@ -340,8 +435,8 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                   ..sort(
                     (a, b) => (b.lastRead ?? 0).compareTo(a.lastRead ?? 0),
                   );
-            final catAll = [...inCat]
-              ..sort((a, b) => (b.dateAdded ?? 0).compareTo(a.dateAdded ?? 0));
+            // The grid keeps the sheet's sort order; only the rail re-orders.
+            final catAll = inCat;
 
             final parts = <Widget>[];
             if (catContinue.isNotEmpty) {
@@ -399,6 +494,8 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                   node: _scopeTopbar,
                   child: _TvHomeTopBar(
                     controller: _searchController,
+                    settings: settings,
+                    entries: entries,
                     onChanged: (v) => setState(() => _query = v),
                   ),
                 ),
@@ -424,8 +521,15 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
 /// Search field + card-density control. Sits above the rows; Up from the hero
 /// reaches it.
 class _TvHomeTopBar extends StatelessWidget {
-  const _TvHomeTopBar({required this.controller, required this.onChanged});
+  const _TvHomeTopBar({
+    required this.controller,
+    required this.settings,
+    required this.entries,
+    required this.onChanged,
+  });
   final TextEditingController controller;
+  final Settings settings;
+  final List<Manga> entries;
   final ValueChanged<String> onChanged;
 
   @override
@@ -490,23 +594,38 @@ class _TvHomeTopBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          const _CardSizeButton(),
+          _LibrarySettingsButton(settings: settings, entries: entries),
         ],
       ),
     );
   }
 }
 
-/// Cycles the card density (compact → comfortable → large).
-class _CardSizeButton extends ConsumerStatefulWidget {
-  const _CardSizeButton();
+/// Opens the library's own filter/sort/display sheet — the same one the phone
+/// app uses, already d-pad traversable. Its grid-size slider is where card
+/// density now lives.
+class _LibrarySettingsButton extends ConsumerStatefulWidget {
+  const _LibrarySettingsButton({required this.settings, required this.entries});
+
+  final Settings settings;
+  final List<Manga> entries;
 
   @override
-  ConsumerState<_CardSizeButton> createState() => _CardSizeButtonState();
+  ConsumerState<_LibrarySettingsButton> createState() =>
+      _LibrarySettingsButtonState();
 }
 
-class _CardSizeButtonState extends ConsumerState<_CardSizeButton> {
+class _LibrarySettingsButtonState extends ConsumerState<_LibrarySettingsButton>
+    with SingleTickerProviderStateMixin {
   bool _focused = false;
+
+  void _open() => showLibrarySettingsSheet(
+    context: context,
+    vsync: this,
+    settings: widget.settings,
+    itemType: ItemType.anime,
+    entries: widget.entries,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -514,14 +633,17 @@ class _CardSizeButtonState extends ConsumerState<_CardSizeButton> {
     return Focus(
       onFocusChange: (f) => setState(() => _focused = f),
       onKeyEvent: (node, event) {
-        if (event is KeyDownEvent && _isSelectKey(event.logicalKey)) {
-          ref.read(tvHomeCardScaleProvider.notifier).cycle();
+        // Opens on release: the sheet must not inherit the repeats of the press
+        // that opened it (SingleActivator activates on repeats).
+        if (event is KeyUpEvent && _isSelectKey(event.logicalKey)) {
+          _open();
           return KeyEventResult.handled;
         }
+        if (_isSelectKey(event.logicalKey)) return KeyEventResult.handled;
         return KeyEventResult.ignored;
       },
       child: GestureDetector(
-        onTap: () => ref.read(tvHomeCardScaleProvider.notifier).cycle(),
+        onTap: _open,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.all(11),
@@ -530,7 +652,7 @@ class _CardSizeButtonState extends ConsumerState<_CardSizeButton> {
             color: _focused ? accent : accent.withValues(alpha: 0.12),
           ),
           child: Icon(
-            Icons.grid_view_rounded,
+            Icons.filter_list_sharp,
             size: 22,
             color: _focused ? Colors.white : accent,
           ),
@@ -557,16 +679,25 @@ class _MangaGrid extends ConsumerWidget {
         ),
       );
     }
-    final width = _cardWidthFor(ref.watch(tvHomeCardScaleProvider));
+    // Mirrors GridViewWidget: 0 means "default", anything else is an exact
+    // number of columns.
+    final gridSize = _gridSize(ref);
     return GridView.builder(
       clipBehavior: Clip.none,
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: width + 10,
-        childAspectRatio: 0.60,
-        mainAxisSpacing: 6,
-        crossAxisSpacing: 6,
-      ),
+      gridDelegate: gridSize <= 0
+          ? const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: _defaultCardWidth + 10,
+              childAspectRatio: 0.60,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 6,
+            )
+          : SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: gridSize,
+              childAspectRatio: 0.60,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 6,
+            ),
       itemCount: items.length,
       itemBuilder: (context, index) => _TvHomeCard(manga: items[index]),
     );
@@ -976,9 +1107,9 @@ class _TvHomeRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scale = ref.watch(tvHomeCardScaleProvider);
-    final width = _cardWidthFor(scale);
-    final height = _rowHeightFor(scale);
+    final gridSize = _gridSize(ref);
+    final width = _cardWidth(context, gridSize);
+    final height = _rowHeight(context, gridSize);
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Column(
