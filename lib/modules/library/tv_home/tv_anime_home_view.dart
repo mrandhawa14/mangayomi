@@ -521,6 +521,9 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
           }
           _order = order;
 
+          // Whatever is painted behind the pills — the colour the scrolling
+          // content has to dissolve into at the top of its viewport.
+          final pageBg = Theme.of(context).scaffoldBackgroundColor;
           return Focus(
             onKeyEvent: _handleVertical,
             child: Column(
@@ -543,7 +546,38 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                     onSelect: (id) => setState(() => _selected = id),
                   ),
                 ),
-                Expanded(child: content),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(child: content),
+                      // The hero's backdrop is full-bleed, so scrolling it up
+                      // under the pills leaves the viewport's clip cutting
+                      // straight across it. The hero fades at its *own* top
+                      // edge, which by then is off-screen — so dissolve the
+                      // cut here, where it actually happens.
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: 36,
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  pageBg,
+                                  pageBg.withValues(alpha: 0),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           );
@@ -903,22 +937,17 @@ class _HeroContent extends ConsumerWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // The backdrop fades its own alpha out at both edges rather than
-            // blending toward a background colour. The home has no Scaffold of
-            // its own, so a colour fade has to guess what's painted behind it,
-            // and any mismatch shows up as a hard line where the gradient ends.
+            // The backdrop fades its own alpha out into the rows below, rather
+            // than blending toward a background colour it would have to guess
+            // at. Its top edge is handled by the fade over the whole content
+            // viewport — that edge moves as the hero scrolls, this one doesn't.
             ShaderMask(
               blendMode: BlendMode.dstIn,
               shaderCallback: (rect) => const LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: [0.0, 0.10, 0.72, 1.0],
-                colors: [
-                  Colors.transparent,
-                  Colors.white,
-                  Colors.white,
-                  Colors.transparent,
-                ],
+                stops: [0.0, 0.72, 1.0],
+                colors: [Colors.white, Colors.white, Colors.transparent],
               ).createShader(rect),
               child: Stack(
                 fit: StackFit.expand,
