@@ -459,8 +459,11 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                   ..sort(
                     (a, b) => (b.lastRead ?? 0).compareTo(a.lastRead ?? 0),
                   );
-            // Same hero rule as All: what you'd resume, else what you added last.
-            final catHero = (catContinue.isNotEmpty ? catContinue : inCat)
+            // Same hero rule as All: what you'd resume, else what you added
+            // last — never "whatever the sort tab happens to put first".
+            final catRecent = [...inCat]
+              ..sort((a, b) => (b.dateAdded ?? 0).compareTo(a.dateAdded ?? 0));
+            final catHero = (catContinue.isNotEmpty ? catContinue : catRecent)
                 .take(6)
                 .toList();
 
