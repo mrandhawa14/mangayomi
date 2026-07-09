@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -80,6 +79,9 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
     12,
     (i) => FocusScopeNode(debugLabel: 'tvHomeRow$i'),
   );
+  // The search / category grid is a 2D section: it navigates internally and
+  // only hands off to the pills at its top edge.
+  final _scopeGrid = FocusScopeNode(debugLabel: 'tvHomeGrid');
   List<FocusScopeNode> _order = const [];
 
   @override
@@ -88,6 +90,7 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
     _scopeTopbar.dispose();
     _scopePills.dispose();
     _scopeHero.dispose();
+    _scopeGrid.dispose();
     for (final s in _scopeRows) {
       s.dispose();
     }
@@ -107,26 +110,39 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
     }
     final cur = _order.indexWhere((s) => s.hasFocus);
     if (cur == -1) return KeyEventResult.ignored;
-    final target = k == LogicalKeyboardKey.arrowDown ? cur + 1 : cur - 1;
+    final down = k == LogicalKeyboardKey.arrowDown;
+
+    // The grid is 2D — let it move between its own rows first; only when it
+    // can't (top/bottom edge) do we hop to the adjacent section.
+    if (identical(_order[cur], _scopeGrid)) {
+      final moved =
+          FocusManager.instance.primaryFocus?.focusInDirection(
+            down ? TraversalDirection.down : TraversalDirection.up,
+          ) ??
+          false;
+      if (moved) return KeyEventResult.handled;
+    }
+
+    final target = down ? cur + 1 : cur - 1;
     if (target < 0 || target >= _order.length) return KeyEventResult.ignored;
     // Column-preserving: land on the *same* card index in the target row so
     // Up/Down keeps your horizontal position instead of snapping to card 1.
     final curDesc = _order[cur].traversalDescendants.toList();
     final col = curDesc.indexWhere((n) => n.hasPrimaryFocus);
+    // If the target has nothing focusable (e.g. a category you just created and
+    // haven't filled yet), stay put rather than dropping focus into a void.
     _focusSection(_order[target], col < 0 ? 0 : col);
     return KeyEventResult.handled;
   }
 
-  // Focus the card at [column] in a section (clamped) — always a visible child,
-  // so a card/button shows the focus ring and the horizontal position carries
-  // over between rows.
-  void _focusSection(FocusScopeNode scope, int column) {
+  /// Focus the card at [column] in a section (clamped) — always a visible child,
+  /// so a card/button shows the focus ring and the horizontal position carries
+  /// over. Returns false when the section has no focusable children.
+  bool _focusSection(FocusScopeNode scope, int column) {
     final descendants = scope.traversalDescendants.toList();
-    if (descendants.isEmpty) {
-      scope.requestFocus();
-      return;
-    }
+    if (descendants.isEmpty) return false;
     descendants[column.clamp(0, descendants.length - 1)].requestFocus();
+    return true;
   }
 
   @override
@@ -223,7 +239,14 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                       (b.name ?? '').toLowerCase(),
                     ),
                   );
-            content = _MangaGrid(items: matches, emptyLabel: 'No matching anime');
+            order.add(_scopeGrid);
+            content = FocusScope(
+              node: _scopeGrid,
+              child: _MangaGrid(
+                items: matches,
+                emptyLabel: 'No matching anime',
+              ),
+            );
           } else if (selectedId == null) {
             order.add(_scopeHero);
             final rows = <Widget>[
@@ -267,7 +290,11 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
               children: rows,
             );
           } else {
-            content = _CategoryGrid(categoryId: selectedId!);
+            order.add(_scopeGrid);
+            content = FocusScope(
+              node: _scopeGrid,
+              child: _CategoryGrid(categoryId: selectedId!),
+            );
           }
           _order = order;
 
@@ -465,36 +492,47 @@ class _TvHomeHero extends StatefulWidget {
   State<_TvHomeHero> createState() => _TvHomeHeroState();
 }
 
-class _TvHomeHeroState extends State<_TvHomeHero> {
+class _TvHomeHeroState extends State<_TvHomeHero>
+    with SingleTickerProviderStateMixin {
+  static const _dwell = Duration(seconds: 7);
   int _index = 0;
-  Timer? _timer;
-  bool _paused = false;
+  late final AnimationController _ctrl;
 
   @override
   void initState() {
     super.initState();
-    _restart();
+    // One clock drives both the dwell timer and the progress indicator.
+    _ctrl = AnimationController(vsync: this, duration: _dwell)
+      ..addStatusListener((s) {
+        if (s == AnimationStatus.completed && mounted) {
+          setState(() => _index = (_index + 1) % widget.items.length);
+          _ctrl.forward(from: 0);
+        }
+      });
+    if (widget.items.length > 1) _ctrl.forward();
   }
 
-  void _restart() {
-    _timer?.cancel();
+  /// Pause the dwell while the hero is focused so it never rotates out from
+  /// under you; resume when focus leaves.
+  void _setPaused(bool paused) {
     if (widget.items.length <= 1) return;
-    _timer = Timer.periodic(const Duration(seconds: 7), (_) {
-      if (_paused || !mounted) return;
-      setState(() => _index = (_index + 1) % widget.items.length);
-    });
+    if (paused) {
+      _ctrl.stop();
+    } else if (!_ctrl.isAnimating) {
+      _ctrl.forward();
+    }
   }
 
   @override
   void didUpdateWidget(_TvHomeHero old) {
     super.didUpdateWidget(old);
     if (_index >= widget.items.length) _index = 0;
-    if (old.items.length != widget.items.length) _restart();
+    if (widget.items.length > 1 && !_ctrl.isAnimating) _ctrl.forward();
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _ctrl.dispose();
     super.dispose();
   }
 
@@ -505,12 +543,78 @@ class _TvHomeHeroState extends State<_TvHomeHero> {
     return Focus(
       canRequestFocus: false,
       skipTraversal: true,
-      // Pause rotation while the hero (its Continue button) is focused.
-      onFocusChange: (f) => _paused = f,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 500),
-        child: _HeroContent(key: ValueKey(manga.id), manga: manga),
+      onFocusChange: _setPaused,
+      child: Stack(
+        children: [
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 500),
+            child: _HeroContent(key: ValueKey(manga.id), manga: manga),
+          ),
+          if (widget.items.length > 1)
+            Positioned(
+              right: 34,
+              bottom: 26,
+              child: _RotationDots(
+                controller: _ctrl,
+                count: widget.items.length,
+                index: _index,
+              ),
+            ),
+        ],
       ),
+    );
+  }
+}
+
+/// The rotation timer: the active item is a short bar that fills over the dwell
+/// time; the others are muted dots. Deliberately not a countdown number.
+class _RotationDots extends StatelessWidget {
+  const _RotationDots({
+    required this.controller,
+    required this.count,
+    required this.index,
+  });
+  final AnimationController controller;
+  final int count;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.primaryColor;
+    final muted = Colors.white.withValues(alpha: 0.28);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(count, (i) {
+        final active = i == index;
+        return Padding(
+          padding: const EdgeInsets.only(left: 6),
+          child: active
+              ? SizedBox(
+                  width: 24,
+                  height: 4,
+                  child: AnimatedBuilder(
+                    animation: controller,
+                    builder: (context, _) => ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: controller.value,
+                        minHeight: 4,
+                        backgroundColor: muted,
+                        valueColor: AlwaysStoppedAnimation<Color>(accent),
+                      ),
+                    ),
+                  ),
+                )
+              : Container(
+                  width: 6,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: muted,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+        );
+      }),
     );
   }
 }
