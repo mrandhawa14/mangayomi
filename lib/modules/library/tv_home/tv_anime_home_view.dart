@@ -873,7 +873,6 @@ class _HeroContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final image = resolveCoverImage(manga, ref);
-    final bg = Theme.of(context).scaffoldBackgroundColor;
     final total = manga.chapters.length;
     final read = manga.chapters.where((c) => c.isRead ?? false).length;
     final unread = manga.chapters.where((c) => !(c.isRead ?? true)).length;
@@ -904,30 +903,41 @@ class _HeroContent extends ConsumerWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-              child: Image(image: image, fit: BoxFit.cover),
-            ),
-            // Darken the left so the title/summary stay readable.
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [Color(0xDB000000), Color(0x40000000)],
-                ),
-              ),
-            ),
-            // Fade BOTH the top and bottom into the page background so the hero
-            // blends in from above and below (no sharp seams).
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: const [0.0, 0.2, 0.75, 1.0],
-                  colors: [bg, Colors.transparent, Colors.transparent, bg],
-                ),
+            // The backdrop fades its own alpha out at both edges rather than
+            // blending toward a background colour. The home has no Scaffold of
+            // its own, so a colour fade has to guess what's painted behind it,
+            // and any mismatch shows up as a hard line where the gradient ends.
+            ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (rect) => const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: [0.0, 0.10, 0.72, 1.0],
+                colors: [
+                  Colors.transparent,
+                  Colors.white,
+                  Colors.white,
+                  Colors.transparent,
+                ],
+              ).createShader(rect),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ImageFiltered(
+                    imageFilter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                    child: Image(image: image, fit: BoxFit.cover),
+                  ),
+                  // Darken the left so the title/summary stay readable.
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [Color(0xDB000000), Color(0x40000000)],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             Padding(
