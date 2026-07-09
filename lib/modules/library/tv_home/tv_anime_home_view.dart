@@ -84,6 +84,9 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
   // only hands off to the pills at its top edge.
   final _scopeGrid = FocusScopeNode(debugLabel: 'tvHomeGrid');
   List<FocusScopeNode> _order = const [];
+  // Kept from the last build so the Menu key can raise the hidden-category
+  // list from anywhere on the screen, without a chip advertising it.
+  List<Category> _hiddenCats = const [];
 
   @override
   void dispose() {
@@ -106,6 +109,13 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
       return KeyEventResult.ignored;
     }
     final k = event.logicalKey;
+    // The remote's Menu button (☰) is the way into the hidden categories. It
+    // does nothing else on this screen, and unlike OK it can't be held, so the
+    // dialog it opens never inherits the rest of the press.
+    if (k == LogicalKeyboardKey.contextMenu && event is KeyDownEvent) {
+      _showHiddenCategoriesDialog(context, _hiddenCats);
+      return KeyEventResult.handled;
+    }
     if (k != LogicalKeyboardKey.arrowDown && k != LogicalKeyboardKey.arrowUp) {
       return KeyEventResult.ignored;
     }
@@ -171,6 +181,7 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
               .map((c) => c.id)
               .whereType<int>()
               .toSet();
+          _hiddenCats = hiddenCats;
           final cats = allCats.where((c) => !(c.hide ?? false)).toList()
             ..sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0));
           final visible = hiddenCatIds.isEmpty
@@ -182,8 +193,8 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                 }).toList();
 
           // Only a genuinely empty library short-circuits the whole screen. If
-          // everything is merely hidden, keep the pill bar on screen — it holds
-          // the Hidden pill, which is the only way back.
+          // everything is merely hidden, keep the pill bar on screen — holding
+          // OK on "All" is the way back, and _EmptyHome has no "All".
           if (allAnime.isEmpty) return const _EmptyHome();
 
           // Continue Watching = every anime you've actually played, from watch
@@ -255,7 +266,7 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                 padding: const EdgeInsets.all(24),
                 child: Text(
                   'Every title sits in a hidden category.\n'
-                  'Unhide one from the Hidden pill above.',
+                  'Press Menu, or hold OK on “All”, to unhide one.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Theme.of(context).hintColor),
                 ),
@@ -1042,58 +1053,20 @@ class _CategoryPillsState extends State<_CategoryPills> {
     super.dispose();
   }
 
-  void _focusAll({int delayMs = 0}) {
-    Future<void>.delayed(Duration(milliseconds: delayMs), () {
+  void _focusAll() {
+    Future<void>.microtask(() {
       if (mounted) _allNode.requestFocus();
     });
   }
 
   /// Hold OK on a category pill to hide it: the pill goes away and so do its
-  /// titles, matching what hiding does in the library. Direct rather than
-  /// confirmed — the OK key is still held when a dialog would open, so its
-  /// repeats would drive the dialog. The toast names the way back instead.
+  /// titles, matching what hiding does in the library. Unconfirmed, because the
+  /// toast that names the way back doubles as the undo prompt.
   void _hide(Category category) {
     isar.writeTxnSync(() => isar.categorys.putSync(category..hide = true));
     if (widget.selected == category.id) widget.onSelect(null);
     _focusAll();
-    botToast('Hid “${category.name}” · unhide it from the Hidden pill');
-  }
-
-  void _showHidden() {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Hidden categories'),
-        content: SizedBox(
-          width: 380,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final c in widget.hidden)
-                ListTile(
-                  title: Text(c.name ?? ''),
-                  trailing: const Icon(Icons.visibility_outlined),
-                  onTap: () {
-                    isar.writeTxnSync(
-                      () => isar.categorys.putSync(c..hide = false),
-                    );
-                    Navigator.pop(dialogContext);
-                    // Land on All once the pop has settled — until then the
-                    // closing route still owns focus restoration.
-                    _focusAll(delayMs: 350);
-                  },
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
+    botToast('Hid “${category.name}” · press Menu or hold OK on All to unhide');
   }
 
   @override
@@ -1117,6 +1090,8 @@ class _CategoryPillsState extends State<_CategoryPills> {
                     selected: widget.selected == null,
                     autofocus: true,
                     onTap: () => widget.onSelect(null),
+                    onLongPress: () =>
+                        _showHiddenCategoriesDialog(context, widget.hidden),
                   ),
                   for (final c in widget.categories)
                     Padding(
@@ -1126,15 +1101,6 @@ class _CategoryPillsState extends State<_CategoryPills> {
                         selected: widget.selected == c.id,
                         onTap: () => widget.onSelect(c.id),
                         onLongPress: () => _hide(c),
-                      ),
-                    ),
-                  if (widget.hidden.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: _Pill(
-                        label: 'Hidden (${widget.hidden.length})',
-                        icon: Icons.visibility_off_outlined,
-                        onTap: _showHidden,
                       ),
                     ),
                   Padding(
@@ -1182,7 +1148,7 @@ class _Pill extends StatefulWidget {
 
 class _PillState extends State<_Pill> {
   bool _focused = false;
-  bool _longFired = false;
+  bool _held = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1214,22 +1180,25 @@ class _PillState extends State<_Pill> {
       onKeyEvent: (node, event) {
         if (!_isSelectKey(event.logicalKey)) return KeyEventResult.ignored;
         // A remote reports a held OK as key *repeats*, never as a pointer
-        // long-press, so hold is read off the first repeat and tap off the
-        // release. Mouse and touch take the GestureDetector below instead.
+        // long-press. Both tap and hold resolve on release, so whatever a hold
+        // opens never inherits the rest of that press — a dialog raised on the
+        // first repeat would be driven by the repeats still to come.
         if (event is KeyDownEvent) {
-          _longFired = false;
+          _held = false;
           return KeyEventResult.handled;
         }
         if (event is KeyRepeatEvent) {
-          if (!_longFired && widget.onLongPress != null) {
-            _longFired = true;
-            widget.onLongPress!();
-          }
+          _held = true;
           return KeyEventResult.handled;
         }
         if (event is KeyUpEvent) {
-          if (!_longFired) widget.onTap();
-          _longFired = false;
+          final longPress = widget.onLongPress;
+          if (_held && longPress != null) {
+            longPress();
+          } else {
+            widget.onTap();
+          }
+          _held = false;
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
@@ -1272,6 +1241,48 @@ class _PillState extends State<_Pill> {
 
 /// Reuses the categories screen's add-category flow to create an anime category
 /// inline from the home.
+/// Has no chip, no icon, nothing on screen: a visible "Hidden" affordance would
+/// advertise the categories the user hid, which is most of what hiding is for.
+/// Reached with the remote's Menu button, or by holding OK on the "All" pill.
+void _showHiddenCategoriesDialog(BuildContext context, List<Category> hidden) {
+  if (hidden.isEmpty) {
+    botToast('No hidden categories');
+    return;
+  }
+  showDialog(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Hidden categories'),
+      content: SizedBox(
+        width: 380,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < hidden.length; i++)
+              ListTile(
+                autofocus: i == 0,
+                title: Text(hidden[i].name ?? ''),
+                trailing: const Icon(Icons.visibility_outlined),
+                onTap: () {
+                  isar.writeTxnSync(
+                    () => isar.categorys.putSync(hidden[i]..hide = false),
+                  );
+                  Navigator.pop(dialogContext);
+                },
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
+}
+
 void _showAddCategoryDialog(BuildContext context, List<Category> existing) {
   final controller = TextEditingController();
   bool isExist = false;
