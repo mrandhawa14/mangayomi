@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
+import 'package:mangayomi/eval/model/m_bridge.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/category.dart';
 import 'package:mangayomi/models/chapter.dart';
@@ -164,8 +165,9 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
           // title stays visible if it's uncategorised, or sits in at least one
           // non-hidden category.
           final allCats = catsAsync.asData?.value ?? const <Category>[];
-          final hiddenCatIds = allCats
-              .where((c) => c.hide ?? false)
+          final hiddenCats = allCats.where((c) => c.hide ?? false).toList()
+            ..sort((a, b) => (a.pos ?? 0).compareTo(b.pos ?? 0));
+          final hiddenCatIds = hiddenCats
               .map((c) => c.id)
               .whereType<int>()
               .toSet();
@@ -179,7 +181,10 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                       mc.any((id) => !hiddenCatIds.contains(id));
                 }).toList();
 
-          if (visible.isEmpty) return const _EmptyHome();
+          // Only a genuinely empty library short-circuits the whole screen. If
+          // everything is merely hidden, keep the pill bar on screen — it holds
+          // the Hidden pill, which is the only way back.
+          if (allAnime.isEmpty) return const _EmptyHome();
 
           // Continue Watching = every anime you've actually played, from watch
           // history, most-recently-watched first.
@@ -244,7 +249,19 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
           // row. Grid views leave the grid out (default 2D focus handles it).
           final order = <FocusScopeNode>[_scopeTopbar, _scopePills];
           Widget content;
-          if (searching) {
+          if (visible.isEmpty) {
+            content = Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Every title sits in a hidden category.\n'
+                  'Unhide one from the Hidden pill above.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Theme.of(context).hintColor),
+                ),
+              ),
+            );
+          } else if (searching) {
             final matches =
                 visible
                     .where((m) => (m.name ?? '').toLowerCase().contains(q))
@@ -390,6 +407,7 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
                   child: _CategoryPills(
                     selected: selectedId,
                     categories: cats,
+                    hidden: hiddenCats,
                     onSelect: (id) => setState(() => _selected = id),
                   ),
                 ),
@@ -996,15 +1014,87 @@ class _TvHomeRow extends ConsumerWidget {
 
 /// The category filter bar under the search row: [All] + a pill per category +
 /// [+ Category]. Selecting sets the filter but keeps focus on the pill.
-class _CategoryPills extends StatelessWidget {
+class _CategoryPills extends StatefulWidget {
   const _CategoryPills({
     required this.selected,
     required this.categories,
+    required this.hidden,
     required this.onSelect,
   });
   final int? selected;
   final List<Category> categories;
+  final List<Category> hidden;
   final ValueChanged<int?> onSelect;
+
+  @override
+  State<_CategoryPills> createState() => _CategoryPillsState();
+}
+
+class _CategoryPillsState extends State<_CategoryPills> {
+  /// "All" is the one pill that always exists, so it's where focus lands when
+  /// the pill that had it leaves the tree — hiding it, or unhiding the last
+  /// hidden category and losing the Hidden pill with it.
+  final _allNode = FocusNode(debugLabel: 'tvPillAll');
+
+  @override
+  void dispose() {
+    _allNode.dispose();
+    super.dispose();
+  }
+
+  void _focusAll({int delayMs = 0}) {
+    Future<void>.delayed(Duration(milliseconds: delayMs), () {
+      if (mounted) _allNode.requestFocus();
+    });
+  }
+
+  /// Hold OK on a category pill to hide it: the pill goes away and so do its
+  /// titles, matching what hiding does in the library. Direct rather than
+  /// confirmed — the OK key is still held when a dialog would open, so its
+  /// repeats would drive the dialog. The toast names the way back instead.
+  void _hide(Category category) {
+    isar.writeTxnSync(() => isar.categorys.putSync(category..hide = true));
+    if (widget.selected == category.id) widget.onSelect(null);
+    _focusAll();
+    botToast('Hid “${category.name}” · unhide it from the Hidden pill');
+  }
+
+  void _showHidden() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Hidden categories'),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final c in widget.hidden)
+                ListTile(
+                  title: Text(c.name ?? ''),
+                  trailing: const Icon(Icons.visibility_outlined),
+                  onTap: () {
+                    isar.writeTxnSync(
+                      () => isar.categorys.putSync(c..hide = false),
+                    );
+                    Navigator.pop(dialogContext);
+                    // Land on All once the pop has settled — until then the
+                    // closing route still owns focus restoration.
+                    _focusAll(delayMs: 350);
+                  },
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1023,17 +1113,28 @@ class _CategoryPills extends StatelessWidget {
                 children: [
                   _Pill(
                     label: 'All',
-                    selected: selected == null,
+                    focusNode: _allNode,
+                    selected: widget.selected == null,
                     autofocus: true,
-                    onTap: () => onSelect(null),
+                    onTap: () => widget.onSelect(null),
                   ),
-                  for (final c in categories)
+                  for (final c in widget.categories)
                     Padding(
                       padding: const EdgeInsets.only(left: 8),
                       child: _Pill(
                         label: c.name ?? '',
-                        selected: selected == c.id,
-                        onTap: () => onSelect(c.id),
+                        selected: widget.selected == c.id,
+                        onTap: () => widget.onSelect(c.id),
+                        onLongPress: () => _hide(c),
+                      ),
+                    ),
+                  if (widget.hidden.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: _Pill(
+                        label: 'Hidden (${widget.hidden.length})',
+                        icon: Icons.visibility_off_outlined,
+                        onTap: _showHidden,
                       ),
                     ),
                   Padding(
@@ -1041,7 +1142,8 @@ class _CategoryPills extends StatelessWidget {
                     child: _Pill(
                       label: 'Category',
                       icon: Icons.add,
-                      onTap: () => _showAddCategoryDialog(context, categories),
+                      onTap: () =>
+                          _showAddCategoryDialog(context, widget.categories),
                     ),
                   ),
                 ],
@@ -1060,15 +1162,19 @@ class _Pill extends StatefulWidget {
   const _Pill({
     required this.label,
     required this.onTap,
+    this.onLongPress,
     this.icon,
+    this.focusNode,
     this.selected = false,
     this.autofocus = false,
   });
   final String label;
   final IconData? icon;
+  final FocusNode? focusNode;
   final bool selected;
   final bool autofocus;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   State<_Pill> createState() => _PillState();
@@ -1076,6 +1182,7 @@ class _Pill extends StatefulWidget {
 
 class _PillState extends State<_Pill> {
   bool _focused = false;
+  bool _longFired = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1091,6 +1198,7 @@ class _PillState extends State<_Pill> {
         ? accent
         : Theme.of(context).colorScheme.onSurface;
     return Focus(
+      focusNode: widget.focusNode,
       autofocus: widget.autofocus,
       onFocusChange: (f) {
         setState(() => _focused = f);
@@ -1104,14 +1212,31 @@ class _PillState extends State<_Pill> {
         }
       },
       onKeyEvent: (node, event) {
-        if (event is KeyDownEvent && _isSelectKey(event.logicalKey)) {
-          widget.onTap();
+        if (!_isSelectKey(event.logicalKey)) return KeyEventResult.ignored;
+        // A remote reports a held OK as key *repeats*, never as a pointer
+        // long-press, so hold is read off the first repeat and tap off the
+        // release. Mouse and touch take the GestureDetector below instead.
+        if (event is KeyDownEvent) {
+          _longFired = false;
+          return KeyEventResult.handled;
+        }
+        if (event is KeyRepeatEvent) {
+          if (!_longFired && widget.onLongPress != null) {
+            _longFired = true;
+            widget.onLongPress!();
+          }
+          return KeyEventResult.handled;
+        }
+        if (event is KeyUpEvent) {
+          if (!_longFired) widget.onTap();
+          _longFired = false;
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
       },
       child: GestureDetector(
         onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 130),
           curve: Curves.easeOut,
