@@ -1583,6 +1583,8 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           : null,
       qualityListenable: _video,
       buildQualityOptions: _buildTvQualityOptions,
+      speedListenable: _playbackSpeed,
+      onSetSpeed: _setPlaybackSpeed,
     );
   }
 

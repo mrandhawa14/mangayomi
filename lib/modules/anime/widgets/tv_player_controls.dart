@@ -28,6 +28,8 @@ class TvPlayerControls extends StatefulWidget {
     required this.onNext,
     required this.qualityListenable,
     required this.buildQualityOptions,
+    required this.speedListenable,
+    required this.onSetSpeed,
   });
 
   final Player player;
@@ -43,6 +45,10 @@ class TvPlayerControls extends StatefulWidget {
   // dub/sub control here. Rebuilt when [qualityListenable] fires.
   final Listenable qualityListenable;
   final List<TvTrackOption> Function() buildQualityOptions;
+  // Playback speed: routed through the parent so its own speed notifier (used by
+  // the hold-to-2x gesture) stays in sync rather than calling setRate directly.
+  final ValueListenable<double> speedListenable;
+  final ValueChanged<double> onSetSpeed;
 
   @override
   State<TvPlayerControls> createState() => _TvPlayerControlsState();
@@ -239,14 +245,16 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
                         ],
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    // Quality | Subtitles | Audio pills (current one checked).
+                    const SizedBox(height: 4),
+                    // Quality | Subtitles | Speed | Settings pills.
                     _PillBar(
                       player: widget.player,
                       accent: accent,
                       qualityListenable: widget.qualityListenable,
                       buildQualityOptions: widget.buildQualityOptions,
                       onSettings: widget.onSettings,
+                      speedListenable: widget.speedListenable,
+                      onSetSpeed: widget.onSetSpeed,
                     ),
                   ],
                 ),
@@ -379,6 +387,8 @@ class _PillBar extends StatelessWidget {
     required this.qualityListenable,
     required this.buildQualityOptions,
     required this.onSettings,
+    required this.speedListenable,
+    required this.onSetSpeed,
   });
 
   final Player player;
@@ -386,6 +396,8 @@ class _PillBar extends StatelessWidget {
   final Listenable qualityListenable;
   final List<TvTrackOption> Function() buildQualityOptions;
   final VoidCallback onSettings;
+  final ValueListenable<double> speedListenable;
+  final ValueChanged<double> onSetSpeed;
 
   @override
   Widget build(BuildContext context) {
@@ -455,9 +467,17 @@ class _PillBar extends StatelessWidget {
                   if (i > 0) children.add(const _PillDivider());
                   children.addAll(groups[i]);
                 }
-                // Gear pill at the end of the row (moved here from the top bar),
-                // sized to match the track pills.
+                // Speed group, then the gear, both sized to match the track
+                // pills.
                 if (children.isNotEmpty) children.add(const _PillDivider());
+                children.add(
+                  _SpeedPill(
+                    accent: accent,
+                    speedListenable: speedListenable,
+                    onSetSpeed: onSetSpeed,
+                  ),
+                );
+                children.add(const _PillDivider());
                 children.add(
                   _TrackPill(
                     accent: accent,
@@ -479,6 +499,72 @@ class _PillBar extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+/// Playback-speed pill: shows the current rate, opens a d-pad-focusable list of
+/// presets. Highlighted (like a selected track) whenever it isn't 1×.
+class _SpeedPill extends StatelessWidget {
+  const _SpeedPill({
+    required this.accent,
+    required this.speedListenable,
+    required this.onSetSpeed,
+  });
+
+  final Color accent;
+  final ValueListenable<double> speedListenable;
+  final ValueChanged<double> onSetSpeed;
+
+  static const _presets = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+
+  static String _fmt(double r) {
+    final s = r == r.roundToDouble() ? r.toStringAsFixed(0) : r.toString();
+    return '$s×';
+  }
+
+  void _showMenu(BuildContext context, double current) {
+    final focusIdx = _presets.indexWhere((s) => (s - current).abs() < 0.001);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Playback speed'),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        content: SizedBox(
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < _presets.length; i++)
+                ListTile(
+                  autofocus: i == (focusIdx >= 0 ? focusIdx : 3),
+                  title: Text(_fmt(_presets[i])),
+                  trailing: (_presets[i] - current).abs() < 0.001
+                      ? Icon(Icons.check, color: accent)
+                      : null,
+                  onTap: () {
+                    onSetSpeed(_presets[i]);
+                    Navigator.pop(ctx);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<double>(
+      valueListenable: speedListenable,
+      builder: (context, rate, _) => _TrackPill(
+        accent: accent,
+        icon: Icons.speed,
+        label: _fmt(rate),
+        selected: (rate - 1.0).abs() > 0.001,
+        onTap: () => _showMenu(context, rate),
+      ),
     );
   }
 }
@@ -706,7 +792,32 @@ class _TvSeekBar extends StatefulWidget {
 
 class _TvSeekBarState extends State<_TvSeekBar> {
   bool _focused = false;
-  static const _step = Duration(seconds: 10);
+
+  // Hold-to-accelerate: a held arrow fires key repeats, and each consecutive
+  // repeat in the same direction grows the seek step, so a long hold covers
+  // ground fast while a single tap still nudges ±10s. Reset on release or when
+  // the direction flips.
+  static const _baseStep = 10; // seconds
+  static const _maxStep = 90;
+  int _holdCount = 0;
+  LogicalKeyboardKey? _holdDir;
+
+  Duration _stepFor(LogicalKeyboardKey dir) {
+    if (_holdDir != dir) {
+      _holdDir = dir;
+      _holdCount = 0;
+    } else {
+      _holdCount++;
+    }
+    // +10s per 3 repeats held: 10 → 20 → 30 … capped.
+    final secs = (_baseStep + (_holdCount ~/ 3) * 10).clamp(_baseStep, _maxStep);
+    return Duration(seconds: secs);
+  }
+
+  void _endHold() {
+    _holdDir = null;
+    _holdCount = 0;
+  }
 
   void _seek(Duration delta) {
     var target = widget.player.state.position + delta;
@@ -720,16 +831,29 @@ class _TvSeekBarState extends State<_TvSeekBar> {
   Widget build(BuildContext context) {
     return Focus(
       focusNode: widget.focusNode,
-      onFocusChange: (f) => setState(() => _focused = f),
+      onFocusChange: (f) {
+        setState(() => _focused = f);
+        if (!f) _endHold();
+      },
       onKeyEvent: (node, event) {
-        if (event is KeyDownEvent || event is KeyRepeatEvent) {
-          final k = event.logicalKey;
-          if (k == LogicalKeyboardKey.arrowLeft) {
-            _seek(-_step);
+        final k = event.logicalKey;
+        final isLeft = k == LogicalKeyboardKey.arrowLeft;
+        final isRight = k == LogicalKeyboardKey.arrowRight;
+        // Releasing an arrow ends the hold ramp.
+        if (event is KeyUpEvent) {
+          if (isLeft || isRight) {
+            _endHold();
             return KeyEventResult.handled;
           }
-          if (k == LogicalKeyboardKey.arrowRight) {
-            _seek(_step);
+          return KeyEventResult.ignored;
+        }
+        if (event is KeyDownEvent || event is KeyRepeatEvent) {
+          if (isLeft) {
+            _seek(-_stepFor(k));
+            return KeyEventResult.handled;
+          }
+          if (isRight) {
+            _seek(_stepFor(k));
             return KeyEventResult.handled;
           }
           // OK/Select toggles play/pause (Netflix model — no separate button).
