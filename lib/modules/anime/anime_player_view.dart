@@ -2109,7 +2109,7 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           fit: fit,
           key: _key,
           controls: (state) => (isTv && ref.read(tvPlayerStyleProvider))
-              ? _tvControls()
+              ? (_tvSettingsOpen ? const SizedBox.shrink() : _tvControls())
               : (isDesktop || isTv)
               ? DesktopControllerWidget(
                   videoController: _controller,
@@ -2218,19 +2218,36 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       ],
     );
     if (!splitSettings) return player;
-    // YouTube-style split: video docks left, settings panel on the right.
-    return Row(
-      children: [
-        Expanded(child: player),
-        TvPlayerSettingsPanel(
-          speedListenable: _playbackSpeed,
-          onSetSpeed: _setPlaybackSpeed,
-          qualityWidget: _videoQualityWidget(context),
-          subtitleWidget: _videoSubtitle(context, (_) {}),
-          audioWidget: _videoAudios(context),
-          onClose: () => setState(() => _tvSettingsOpen = false),
-        ),
-      ],
+    // YouTube-style split: video docks left (a single focusable unit — Left
+    // from the panel focuses it, Select toggles play/pause), a gap, then the
+    // settings panel on the right.
+    final accent = Theme.of(context).colorScheme.primary;
+    return ColoredBox(
+      color: Colors.black,
+      child: Row(
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: TvVideoFocusFrame(
+                accent: accent,
+                onSelect: () => _player.playOrPause(),
+                child: player,
+              ),
+            ),
+          ),
+          TvPlayerSettingsPanel(
+            player: _player,
+            speedListenable: _playbackSpeed,
+            onSetSpeed: _setPlaybackSpeed,
+            selectedShaderListenable: _selectedShader,
+            qualityWidget: _videoQualityWidget(context),
+            subtitleWidget: _videoSubtitle(context, (_) {}),
+            audioWidget: _videoAudios(context),
+            onClose: () => setState(() => _tvSettingsOpen = false),
+          ),
+        ],
+      ),
     );
   }
 
