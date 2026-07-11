@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,9 +83,13 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
 
   void _reveal() {
     if (!mounted) return;
-    if (!_visible) setState(() => _visible = true);
+    final wasHidden = !_visible;
+    if (wasHidden) setState(() => _visible = true);
+    // Always extend the hide timer (so a moving mouse keeps controls up), but
+    // only grab focus on the hidden→visible edge — otherwise a stream of mouse
+    // hover events would re-request focus every frame.
     _startHideTimer();
-    if (!_scope.hasFocus) {
+    if (wasHidden && !_scope.hasFocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         (_playFocus.canRequestFocus ? _playFocus : _scope).requestFocus();
@@ -793,6 +798,17 @@ class _TvSeekBar extends StatefulWidget {
 class _TvSeekBarState extends State<_TvSeekBar> {
   bool _focused = false;
 
+  // Own a node when the parent doesn't supply one, so a mouse click can focus
+  // the bar (and hand keyboard seeking over to it) on desktop.
+  FocusNode? _ownNode;
+  FocusNode get _node => widget.focusNode ?? (_ownNode ??= FocusNode());
+
+  @override
+  void dispose() {
+    _ownNode?.dispose();
+    super.dispose();
+  }
+
   // Hold-to-accelerate: a held arrow fires key repeats, and each consecutive
   // repeat in the same direction grows the seek step, so a long hold covers
   // ground fast while a single tap still nudges ±10s. Reset on release or when
@@ -827,10 +843,18 @@ class _TvSeekBarState extends State<_TvSeekBar> {
     widget.player.seek(target);
   }
 
+  // Mouse tap / drag on the bar seeks to that fraction of the duration.
+  void _seekToFraction(double frac) {
+    final dur = widget.player.state.duration;
+    if (dur <= Duration.zero) return;
+    if (!_node.hasFocus) _node.requestFocus();
+    widget.player.seek(dur * frac.clamp(0.0, 1.0));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Focus(
-      focusNode: widget.focusNode,
+      focusNode: _node,
       onFocusChange: (f) {
         setState(() => _focused = f);
         if (!f) _endHold();
@@ -883,7 +907,14 @@ class _TvSeekBarState extends State<_TvSeekBar> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final w = constraints.maxWidth;
-                  return Stack(
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (d) => _seekToFraction(d.localPosition.dx / w),
+                    onHorizontalDragStart: (d) =>
+                        _seekToFraction(d.localPosition.dx / w),
+                    onHorizontalDragUpdate: (d) =>
+                        _seekToFraction(d.localPosition.dx / w),
+                    child: Stack(
                     children: [
                       // Track + progress, vertically centred.
                       Align(
@@ -925,6 +956,7 @@ class _TvSeekBarState extends State<_TvSeekBar> {
                           ),
                         ),
                     ],
+                    ),
                   );
                 },
               ),

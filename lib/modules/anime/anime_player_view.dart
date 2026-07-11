@@ -2460,7 +2460,17 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
           }
         },
       },
-      child: Focus(autofocus: true, onKeyEvent: _onPlayerKey, child: child),
+      child: MouseRegion(
+        // Desktop debugging: a mouse has no d-pad, so let hover and clicks
+        // reveal the auto-hiding controls (bumping the same notifier the remote
+        // does). No-op on a TV, which sends no pointer-hover events.
+        onEnter: (_) => _revealControls.value++,
+        onHover: (_) => _revealControls.value++,
+        child: Listener(
+          onPointerDown: (_) => _revealControls.value++,
+          child: Focus(autofocus: true, onKeyEvent: _onPlayerKey, child: child),
+        ),
+      ),
     );
   }
 
