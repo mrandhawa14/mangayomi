@@ -576,32 +576,13 @@ class _SpeedPill extends StatelessWidget {
   }
 
   void _showMenu(BuildContext context, double current) {
-    final focusIdx = _presets.indexWhere((s) => (s - current).abs() < 0.001);
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Playback speed'),
-        contentPadding: const EdgeInsets.symmetric(vertical: 8),
-        content: SizedBox(
-          width: 300,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var i = 0; i < _presets.length; i++)
-                ListTile(
-                  autofocus: i == (focusIdx >= 0 ? focusIdx : 3),
-                  title: Text(_fmt(_presets[i])),
-                  trailing: (_presets[i] - current).abs() < 0.001
-                      ? Icon(Icons.check, color: accent)
-                      : null,
-                  onTap: () {
-                    onSetSpeed(_presets[i]);
-                    Navigator.pop(ctx);
-                  },
-                ),
-            ],
-          ),
-        ),
+      builder: (ctx) => _SpeedMenu(
+        accent: accent,
+        presets: _presets,
+        current: current,
+        onPick: onSetSpeed,
       ),
     );
   }
@@ -616,6 +597,135 @@ class _SpeedPill extends StatelessWidget {
         label: _fmt(rate),
         selected: (rate - 1.0).abs() > 0.001,
         onTap: () => _showMenu(context, rate),
+      ),
+    );
+  }
+}
+
+/// The playback-speed picker. Owns its focus containment: Up/Down move within
+/// the list and are *always* consumed (clamped at the ends), so d-pad focus
+/// can't escape past the edges to the controls behind the still-open dialog —
+/// which was letting the speed pill re-open a second dialog on top of this one.
+class _SpeedMenu extends StatefulWidget {
+  const _SpeedMenu({
+    required this.accent,
+    required this.presets,
+    required this.current,
+    required this.onPick,
+  });
+
+  final Color accent;
+  final List<double> presets;
+  final double current;
+  final ValueChanged<double> onPick;
+
+  @override
+  State<_SpeedMenu> createState() => _SpeedMenuState();
+}
+
+class _SpeedMenuState extends State<_SpeedMenu> {
+  late final List<FocusNode> _nodes = List.generate(
+    widget.presets.length,
+    (_) => FocusNode(),
+  );
+  late int _index;
+
+  @override
+  void initState() {
+    super.initState();
+    final sel = widget.presets.indexWhere(
+      (s) => (s - widget.current).abs() < 0.001,
+    );
+    _index = sel >= 0 ? sel : widget.presets.length ~/ 2;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _nodes[_index].requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    for (final n in _nodes) {
+      n.dispose();
+    }
+    super.dispose();
+  }
+
+  void _move(int delta) {
+    final next = (_index + delta).clamp(0, _nodes.length - 1);
+    if (next != _index) {
+      setState(() => _index = next);
+      _nodes[next].requestFocus();
+    }
+  }
+
+  void _pick(int i) {
+    widget.onPick(widget.presets[i]);
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Playback speed'),
+      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+      content: SizedBox(
+        width: 300,
+        child: FocusTraversalGroup(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < widget.presets.length; i++)
+                Focus(
+                  focusNode: _nodes[i],
+                  onKeyEvent: (node, event) {
+                    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+                      return KeyEventResult.ignored;
+                    }
+                    final k = event.logicalKey;
+                    if (k == LogicalKeyboardKey.arrowDown) {
+                      _move(1);
+                      return KeyEventResult.handled;
+                    }
+                    if (k == LogicalKeyboardKey.arrowUp) {
+                      _move(-1);
+                      return KeyEventResult.handled;
+                    }
+                    // Swallow Left/Right too, so neither can escape sideways.
+                    if (k == LogicalKeyboardKey.arrowLeft ||
+                        k == LogicalKeyboardKey.arrowRight) {
+                      return KeyEventResult.handled;
+                    }
+                    if (event is KeyDownEvent && _isSelect(k)) {
+                      _pick(i);
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
+                  },
+                  child: InkWell(
+                    onTap: () => _pick(i),
+                    child: Container(
+                      color: i == _index
+                          ? widget.accent.withValues(alpha: 0.18)
+                          : null,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(_SpeedPill._fmt(widget.presets[i])),
+                          ),
+                          if ((widget.presets[i] - widget.current).abs() < 0.001)
+                            Icon(Icons.check, color: widget.accent),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
