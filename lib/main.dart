@@ -107,8 +107,19 @@ void main(List<String> args) async {
       try {
         MediaKit.ensureInitialized();
         await RustLib.init();
-        await imgCropIsolate.start();
-        await getIsolateService.start();
+        // Detect Android TV first so the isolate warm-up below can be gated on
+        // it. No-op on other platforms. See #729.
+        await initIsTv();
+        // These two isolates aren't needed for the first frame (image cropping
+        // is reader-only; the eval service is browse-only) and both self-start
+        // on first use. On a low-RAM Android TV, spawning them serially before
+        // runApp is a real chunk of the launch delay, so defer them to the
+        // background there (see _postLaunchInit). Every other platform keeps the
+        // eager start, so nothing changes off-TV.
+        if (!isTv) {
+          await imgCropIsolate.start();
+          await getIsolateService.start();
+        }
         if (!isMobile) {
           await windowManager.ensureInitialized();
           await WindowGeometry.restore();
@@ -128,9 +139,6 @@ void main(List<String> args) async {
             );
           }
         }
-        // Detect Android TV once, before the UI builds, so form-factor branches
-        // can read `isTv`. No-op on other platforms. See #729.
-        await initIsTv();
         // Don't force the Android "all files access" (MANAGE_EXTERNAL_STORAGE)
         // prompt at launch. The database lives in scoped app storage, so the app
         // can start, browse and read online without it. The permission is still
@@ -220,6 +228,12 @@ class _StartupErrorApp extends StatelessWidget {
 
 Future<void> _postLaunchInit(StorageProvider storage) async {
   await AppLogger.init();
+  // On TV these two were skipped before runApp to speed up launch; warm them in
+  // the background now so they're ready before the reader / browse need them.
+  if (isTv) {
+    unawaited(imgCropIsolate.start());
+    unawaited(getIsolateService.start());
+  }
   unawaited(MDownloader.initializeIsolatePool(poolSize: 6));
   final hivePath = isApple ? "databases" : p.join("Mangayomi", "databases");
   await Hive.initFlutter(Platform.isAndroid ? "" : hivePath);
