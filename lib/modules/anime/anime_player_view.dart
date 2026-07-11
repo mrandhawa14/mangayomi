@@ -1574,7 +1574,10 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       revealControls: _revealControls,
       title: widget.episode.manga.value?.name ?? '',
       episodeLabel: widget.episode.name ?? '',
-      onBack: () => Navigator.maybePop(context),
+      // Direct pop, not maybePop: the on-screen back arrow always exits the
+      // player, bypassing the PopScope that makes the remote Back hide the
+      // panel first.
+      onBack: () => Navigator.pop(context),
       onRestart: () => _player.seek(Duration.zero),
       onSettings: () => _videoSettingDraggableMenu(context),
       hasNext: hasNextEpisode,

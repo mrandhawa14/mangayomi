@@ -934,6 +934,23 @@ class _CodeEditorPageState extends ConsumerState<CodeEditorPage> {
                                               : Colors.blueAccent,
                                         ),
                                         const SizedBox(width: 8),
+                                        // Fixed-width HH:MM:SS stamp so every
+                                        // line is timestamped consistently and
+                                        // the messages stay left-aligned.
+                                        Text(
+                                          _logTime(value.$3),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontFamily: 'monospace',
+                                            color: Colors.grey.withValues(
+                                              alpha: 0.7,
+                                            ),
+                                            fontFeatures: const [
+                                              FontFeature.tabularFigures(),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
                                         Expanded(
                                           child: SelectableText(
                                             value.$2,
@@ -1022,4 +1039,10 @@ Widget _textEditing(
       ),
     ),
   );
+}
+
+// HH:MM:SS for a log entry's capture time — consistent, fixed-width.
+String _logTime(DateTime t) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
 }

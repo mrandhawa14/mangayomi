@@ -15,8 +15,11 @@ class Logger {
   static List<(LoggerLevel, String, DateTime)> get logs => _logs;
 
   static void add(LoggerLevel level, String content) {
-    _logStreamController.add((level, content, DateTime.now()));
-    _logs.add((level, content, DateTime.now()));
+    // Capture the time once: calling DateTime.now() twice gave the streamed
+    // copy and the stored copy of the same entry different timestamps.
+    final entry = (level, content, DateTime.now());
+    _logStreamController.add(entry);
+    _logs.add(entry);
   }
 
   static void clear() {

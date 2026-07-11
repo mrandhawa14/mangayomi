@@ -104,6 +104,13 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
     });
   }
 
+  // Immediately hide the control panel (Back dismisses the panel before it
+  // leaves the player).
+  void _hideNow() {
+    _hideTimer?.cancel();
+    if (_visible) setState(() => _visible = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
@@ -113,8 +120,17 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
     final size = MediaQuery.of(context).size;
     final safeH = size.width * 0.08;
     final safeV = size.height * 0.05;
-    return FocusScope(
-      node: _scope,
+    // Back dismisses the visible control panel before it leaves the player:
+    // block the pop while the panel shows and hide it instead; a second Back
+    // (panel already hidden) exits normally. The on-screen back arrow still
+    // exits outright — it pops directly, bypassing this.
+    return PopScope(
+      canPop: !_visible,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _visible) _hideNow();
+      },
+      child: FocusScope(
+        node: _scope,
       // Only build the controls (and their per-frame StreamBuilders) while
       // visible. Otherwise the seek/time streams rebuild ~4x/sec during
       // playback and jank the Fire TV — hidden means nothing to render.
@@ -266,6 +282,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
               ),
             ],
           ),
+      ),
     );
   }
 }
