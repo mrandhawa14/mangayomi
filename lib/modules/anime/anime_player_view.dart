@@ -1779,7 +1779,9 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       onBack: () => Navigator.pop(context),
       onRestart: () => _player.seek(Duration.zero),
       onSettings: () {
-        if (isTv && ref.read(tvAdvancedSettingsProvider)) {
+        // On TV the settings open as the docked side panel; phones/desktop keep
+        // the bottom-sheet menu.
+        if (isTv) {
           setState(() => _tvSettingsOpen = true);
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) _tvPanelFocus.requestFocus();
