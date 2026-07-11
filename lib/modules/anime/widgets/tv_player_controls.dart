@@ -60,6 +60,11 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
   Timer? _hideTimer;
   final FocusScopeNode _scope = FocusScopeNode(debugLabel: 'tvPlayer');
   final FocusNode _playFocus = FocusNode(debugLabel: 'tvPlayerPlayPause');
+  // Always in the tree, even while hidden (when the controls collapse to an
+  // empty box and leave no focusable node). Focus parks here on hide so a key
+  // press can still wake the panel — otherwise, on a keyboard, once it hides
+  // there's nothing focused to receive the wake key.
+  final FocusNode _rootFocus = FocusNode(debugLabel: 'tvPlayerRoot');
   static const _hideAfter = Duration(seconds: 4);
 
   @override
@@ -78,6 +83,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
     _hideTimer?.cancel();
     _scope.dispose();
     _playFocus.dispose();
+    _rootFocus.dispose();
     super.dispose();
   }
 
@@ -99,16 +105,16 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
 
   void _startHideTimer() {
     _hideTimer?.cancel();
-    _hideTimer = Timer(_hideAfter, () {
-      if (mounted) setState(() => _visible = false);
-    });
+    _hideTimer = Timer(_hideAfter, _hideNow);
   }
 
-  // Immediately hide the control panel (Back dismisses the panel before it
-  // leaves the player).
+  // Hide the control panel and park focus on the root node so a key press can
+  // still wake it (Back also dismisses the panel before leaving the player).
   void _hideNow() {
     _hideTimer?.cancel();
-    if (_visible) setState(() => _visible = false);
+    if (!mounted || !_visible) return;
+    setState(() => _visible = false);
+    _rootFocus.requestFocus();
   }
 
   @override
@@ -129,8 +135,31 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop && _visible) _hideNow();
       },
-      child: FocusScope(
-        node: _scope,
+      child: Focus(
+        focusNode: _rootFocus,
+        // While the panel is hidden this node holds focus; any d-pad / select
+        // key wakes the panel (and is consumed so it doesn't also act). While
+        // visible it defers to the focused control. Back is left alone so it
+        // still exits.
+        onKeyEvent: (node, event) {
+          if (_visible) return KeyEventResult.ignored;
+          if (event is KeyDownEvent || event is KeyRepeatEvent) {
+            final k = event.logicalKey;
+            final wake =
+                k == LogicalKeyboardKey.arrowUp ||
+                k == LogicalKeyboardKey.arrowDown ||
+                k == LogicalKeyboardKey.arrowLeft ||
+                k == LogicalKeyboardKey.arrowRight ||
+                _isSelect(k);
+            if (wake) {
+              _reveal();
+              return KeyEventResult.handled;
+            }
+          }
+          return KeyEventResult.ignored;
+        },
+        child: FocusScope(
+          node: _scope,
       // Only build the controls (and their per-frame StreamBuilders) while
       // visible. Otherwise the seek/time streams rebuild ~4x/sec during
       // playback and jank the Fire TV — hidden means nothing to render.
@@ -282,6 +311,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
               ),
             ],
           ),
+        ),
       ),
     );
   }
