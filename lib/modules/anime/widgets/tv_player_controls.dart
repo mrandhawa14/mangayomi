@@ -87,6 +87,11 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
     super.dispose();
   }
 
+  // True while the player is the topmost route. When a dialog (speed / settings)
+  // is open on top, the panel must not hide or touch focus — doing so steals
+  // focus out of the dialog and back to the play button behind it.
+  bool get _isTopRoute => ModalRoute.of(context)?.isCurrent ?? true;
+
   void _reveal() {
     if (!mounted) return;
     final wasHidden = !_visible;
@@ -95,7 +100,7 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
     // only grab focus on the hidden→visible edge — otherwise a stream of mouse
     // hover events would re-request focus every frame.
     _startHideTimer();
-    if (wasHidden && !_scope.hasFocus) {
+    if (wasHidden && !_scope.hasFocus && _isTopRoute) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         (_playFocus.canRequestFocus ? _playFocus : _scope).requestFocus();
@@ -105,7 +110,18 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
 
   void _startHideTimer() {
     _hideTimer?.cancel();
-    _hideTimer = Timer(_hideAfter, _hideNow);
+    _hideTimer = Timer(_hideAfter, _onHideTimer);
+  }
+
+  void _onHideTimer() {
+    if (!mounted) return;
+    // A dialog is open on top — keep the panel and don't touch focus; re-arm so
+    // it hides once the player is back on top.
+    if (!_isTopRoute) {
+      _startHideTimer();
+      return;
+    }
+    _hideNow();
   }
 
   // Hide the control panel and park focus on the root node so a key press can
