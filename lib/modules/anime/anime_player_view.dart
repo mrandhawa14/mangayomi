@@ -970,10 +970,16 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
   // TV-only: when the advanced settings panel is open the video docks left and
   // the panel slides in on the right (YouTube-style), instead of a bottom sheet.
   bool _tvSettingsOpen = false;
+  // Owned focus anchors for the split view so Left/Right cross deterministically
+  // (geometric directional focus was losing focus entirely).
+  final FocusNode _tvVideoFocus = FocusNode(debugLabel: 'tvVideoFrame');
+  final FocusNode _tvPanelFocus = FocusNode(debugLabel: 'tvPanelHeader');
 
   @override
   void dispose() {
     _revealControls.dispose();
+    _tvVideoFocus.dispose();
+    _tvPanelFocus.dispose();
     _watchStopwatch.stop();
     _currentPosition.removeListener(_updateRpcTimestamp);
     _subDelayController.removeListener(_onSubDelayChanged);
@@ -1775,6 +1781,9 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       onSettings: () {
         if (isTv && ref.read(tvAdvancedSettingsProvider)) {
           setState(() => _tvSettingsOpen = true);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _tvPanelFocus.requestFocus();
+          });
         } else {
           _videoSettingDraggableMenu(context);
         }
@@ -2423,7 +2432,9 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
               child: TvVideoFocusFrame(
                 accent: accent,
                 player: _player,
+                focusNode: _tvVideoFocus,
                 onSelect: () => _player.playOrPause(),
+                onExitRight: () => _tvPanelFocus.requestFocus(),
                 child: player,
               ),
             ),
@@ -2436,6 +2447,8 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
             qualityOptions: _tvQualityOptions,
             subtitleOptions: _tvSubtitleOptions,
             audioOptions: _tvAudioOptions,
+            headerFocusNode: _tvPanelFocus,
+            onExitLeft: () => _tvVideoFocus.requestFocus(),
             onClose: () => setState(() => _tvSettingsOpen = false),
           ),
         ],
