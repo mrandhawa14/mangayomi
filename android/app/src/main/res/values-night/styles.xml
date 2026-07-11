@@ -2,12 +2,12 @@
 <resources>
     <!-- Theme applied to the Android Window while the process is starting when the OS's Dark Mode setting is on -->
     <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
-        <!-- Branded splash (red mark on black) until Flutter's first frame. -->
+        <!-- Branded splash (red mark on white) until Flutter's first frame. -->
         <item name="android:windowBackground">@drawable/launch_background</item>
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
-    <!-- Black so there's no flash between the splash and Flutter's first frame. -->
+    <!-- White so there's no flash between the splash and Flutter's first frame. -->
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
-        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowBackground">@android:color/white</item>
     </style>
 </resources>

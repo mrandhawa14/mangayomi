@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Startup splash: the Mangayomi red mark centred on black. Shown natively
+<!-- Startup splash: the Mangayomi red mark centred on white. Shown natively
      from the moment the app is tapped until Flutter draws its first frame, so a
      slow (low-RAM TV) launch reads as a branded loading screen, not a blank. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/black" />
+    <item android:drawable="@android:color/white" />
     <item>
         <bitmap
             android:gravity="center"
