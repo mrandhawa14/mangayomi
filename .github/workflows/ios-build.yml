@@ -1,0 +1,51 @@
+# Dev-only unsigned iOS build so the app can be sideloaded onto an iPhone/iPad
+# (AltStore / Sideloadly / TrollStore) for testing — no paid signing in CI.
+# Debug build, --no-codesign, packaged into an .ipa. Not for distribution.
+name: iOS dev build
+
+on:
+  push:
+    branches: [tv-test-build]
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # A plugin (connectivity_plus) uses newer Network.framework APIs, so build
+      # against the latest SDK (same as the macOS job).
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Pub get
+        run: flutter pub get
+
+      # .g.dart is committed, so no build_runner needed.
+      - name: Build iOS (debug, unsigned)
+        run: flutter build ios --debug --no-codesign
+
+      - name: Package unsigned .ipa
+        run: |
+          APP=$(ls -d build/ios/iphoneos/*.app | head -1)
+          echo "Packaging $APP"
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry mangayomi-ios.ipa Payload
+          ls -lah mangayomi-ios.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mangayomi-ios-ipa
+          path: mangayomi-ios.ipa
