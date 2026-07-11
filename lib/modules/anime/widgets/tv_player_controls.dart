@@ -717,24 +717,38 @@ class _SpeedMenuState extends State<_SpeedMenu> {
                     }
                     return KeyEventResult.ignored;
                   },
-                  child: InkWell(
-                    onTap: () => _pick(i),
-                    child: Container(
-                      color: i == _index
-                          ? widget.accent.withValues(alpha: 0.18)
-                          : null,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(_SpeedPill._fmt(widget.presets[i])),
-                          ),
-                          if ((widget.presets[i] - widget.current).abs() < 0.001)
-                            Icon(Icons.check, color: widget.accent),
-                        ],
+                  child: Padding(
+                    // Inset so the highlight is a rounded pill inside the
+                    // dialog — a full-bleed square looked broken on the last
+                    // row against the dialog's rounded corner.
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    child: InkWell(
+                      onTap: () => _pick(i),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Ink(
+                        decoration: BoxDecoration(
+                          color: i == _index
+                              ? widget.accent.withValues(alpha: 0.18)
+                              : null,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(_SpeedPill._fmt(widget.presets[i])),
+                            ),
+                            if ((widget.presets[i] - widget.current).abs() <
+                                0.001)
+                              Icon(Icons.check, color: widget.accent),
+                          ],
+                        ),
                       ),
                     ),
                   ),
