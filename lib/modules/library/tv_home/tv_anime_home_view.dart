@@ -26,7 +26,6 @@ import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
 import 'package:mangayomi/modules/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
-import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
@@ -199,7 +198,10 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
 
     return Scaffold(
       body: animeAsync.when(
-        loading: () => const ProgressCenter(),
+        // A static skeleton, not a spinner: a spinner freezes mid-spin while the
+        // main isolate is busy at launch and reads as "hung"; a skeleton has no
+        // animation, so it can't stutter (the Netflix/YouTube approach).
+        loading: () => const _HomeSkeleton(),
         error: (e, _) => ErrorText(e),
         data: (allAnime) {
           // A hidden category hides its entries, matching the library (a hidden
@@ -979,9 +981,21 @@ class _HeroContent extends ConsumerWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  ImageFiltered(
-                    imageFilter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                    child: Image(image: image, fit: BoxFit.cover),
+                  // Frosted-glass backdrop, cheaply: the cover is decoded tiny
+                  // (48px, cached per cover by the image cache) and scaled up —
+                  // the upscale plus a light blur gives the gaussian look for
+                  // almost no GPU cost, instead of a live sigma-30 blur on a
+                  // full-res image every frame. RepaintBoundary keeps it off the
+                  // foreground's compositing.
+                  RepaintBoundary(
+                    child: ImageFiltered(
+                      imageFilter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                      child: Image(
+                        image: ResizeImage(image, width: 48),
+                        fit: BoxFit.cover,
+                        gaplessPlayback: true,
+                      ),
+                    ),
                   ),
                   // Darken the left so the title/summary stay readable.
                   const DecoratedBox(
@@ -1656,6 +1670,59 @@ class _TvHomeCard extends ConsumerWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Static loading skeleton in the shape of the home — search bar, hero, a row of
+/// cards — in muted gray. No animation, so it can't stutter while the main
+/// isolate is busy at launch (unlike a spinner).
+class _HomeSkeleton extends StatelessWidget {
+  const _HomeSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final base = Theme.of(context).hintColor.withValues(alpha: 0.12);
+    Widget box(double? w, double h, [double r = 8]) => Container(
+      width: w,
+      height: h,
+      decoration: BoxDecoration(
+        color: base,
+        borderRadius: BorderRadius.circular(r),
+      ),
+    );
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            box(double.infinity, 44, 26), // search bar
+            const SizedBox(height: 16),
+            box(double.infinity, 300, 12), // hero
+            const SizedBox(height: 24),
+            box(170, 18), // row label
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 210,
+              child: ClipRect(
+                child: OverflowBox(
+                  maxWidth: MediaQuery.sizeOf(context).width,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < 7; i++) ...[
+                        box(130, 210, 10),
+                        const SizedBox(width: 12),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
