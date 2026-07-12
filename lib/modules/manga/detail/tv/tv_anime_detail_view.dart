@@ -12,10 +12,13 @@ import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/library/widgets/library_entry_utils.dart';
 import 'package:mangayomi/modules/manga/detail/providers/isar_providers.dart';
 import 'package:mangayomi/modules/manga/detail/providers/update_manga_detail_providers.dart';
+import 'package:mangayomi/modules/more/providers/algorithm_weights_state_provider.dart';
 import 'package:mangayomi/modules/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:mangayomi/utils/extensions/manga_extensions.dart';
+import 'package:mangayomi/utils/extensions/string_extensions.dart';
+import 'package:mangayomi/utils/utils.dart';
 
 /// TV-only, d-pad-first anime detail. A split view echoing the player settings
 /// panel: everything about the title on the left (backdrop, poster, meta, the
@@ -165,13 +168,7 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
                   refreshing: _refreshing,
                   onBack: () => Navigator.maybePop(context),
                   onRefresh: _refresh,
-                  onCategories: () => showCategorySelectionDialog(
-                    context: context,
-                    ref: ref,
-                    itemType: manga.itemType,
-                    singleManga: manga,
-                  ),
-                  onMigrate: () => context.push('/migrate', extra: manga),
+                  onMore: _showMore,
                   onDown: () => _playFocus.requestFocus(),
                 ),
                 Expanded(
@@ -228,19 +225,82 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
     });
     setState(() {});
   }
+
+  /// Overflow menu — the actions the touch app bar carried that don't warrant a
+  /// permanent slot on TV: categories, open-in-browser, migrate, and (anime)
+  /// recommendations / watch order.
+  void _showMore() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => _MoreMenu(
+        items: [
+          (
+            icon: Icons.label_outline,
+            label: 'Edit categories',
+            onTap: () => showCategorySelectionDialog(
+              context: context,
+              ref: ref,
+              itemType: manga.itemType,
+              singleManga: manga,
+            ),
+          ),
+          (
+            icon: Icons.public,
+            label: 'Open in browser',
+            onTap: _openInBrowser,
+          ),
+          (
+            icon: Icons.recommend_outlined,
+            label: 'Recommendations',
+            onTap: () => context.push(
+              '/recommendations',
+              extra: (
+                manga.name,
+                manga.itemType,
+                ref.read(algorithmWeightsStateProvider),
+              ),
+            ),
+          ),
+          (
+            icon: Icons.format_list_numbered,
+            label: 'Watch order',
+            onTap: () => context.push('/watchOrder', extra: (manga.name, null)),
+          ),
+          (
+            icon: Icons.swap_horiz,
+            label: 'Migrate',
+            onTap: () => context.push('/migrate', extra: manga),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openInBrowser() {
+    final source = getSource(manga.lang!, manga.source!, manga.sourceId);
+    if (source == null || manga.link == null) return;
+    context.push(
+      '/mangawebview',
+      extra: {
+        'url': '${source.baseUrl}${manga.link!.getUrlWithoutDomain}',
+        'sourceId': source.id.toString(),
+        'title': manga.name!,
+      },
+    );
+  }
 }
 
-/// Focusable top bar restoring the classic detail's actions (back, refresh,
-/// categories, migrate) that a touch-only app bar / pull-to-refresh dropped on
-/// TV. Down hands focus to the content below.
+/// Focusable top bar restoring the classic detail's actions (back, refresh, and
+/// an overflow "…" with categories / open-in-browser / migrate / recommendations
+/// / watch order) that a touch-only app bar / pull-to-refresh dropped on TV.
+/// Down hands focus to the content below.
 class _TopBar extends StatelessWidget {
   const _TopBar({
     required this.topBarFocus,
     required this.refreshing,
     required this.onBack,
     required this.onRefresh,
-    required this.onCategories,
-    required this.onMigrate,
+    required this.onMore,
     required this.onDown,
   });
 
@@ -248,8 +308,7 @@ class _TopBar extends StatelessWidget {
   final bool refreshing;
   final VoidCallback onBack;
   final VoidCallback onRefresh;
-  final VoidCallback onCategories;
-  final VoidCallback onMigrate;
+  final VoidCallback onMore;
   final VoidCallback onDown;
 
   @override
@@ -279,8 +338,7 @@ class _TopBar extends StatelessWidget {
               icon: refreshing ? Icons.hourglass_empty : Icons.refresh,
               onPressed: onRefresh,
             ),
-            _TopBarButton(icon: Icons.label_outline, onPressed: onCategories),
-            _TopBarButton(icon: Icons.swap_horiz, onPressed: onMigrate),
+            _TopBarButton(icon: Icons.more_horiz, onPressed: onMore),
           ],
         ),
       ),
@@ -370,7 +428,9 @@ class _LeftInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = context.primaryColor;
-    final genres = (manga.genre ?? const <String>[]).take(4).join('  ·  ');
+    final genres = (manga.genre ?? const <String>[])
+        .where((g) => g.trim().isNotEmpty)
+        .toList();
     final metaBits = <String>[
       manga.status.name.isNotEmpty ? _cap(manga.status.name) : '',
       '$episodeCount episodes',
@@ -401,11 +461,10 @@ class _LeftInfo extends StatelessWidget {
         }
         return KeyEventResult.ignored;
       },
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(28, 20, 20, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -445,10 +504,31 @@ class _LeftInfo extends StatelessWidget {
                           ),
                         ),
                       if (genres.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          genres,
-                          style: TextStyle(fontSize: 12, color: accent),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final g in genres.take(6))
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: accent.withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  g,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: accent,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ],
                     ],
@@ -467,6 +547,7 @@ class _LeftInfo extends StatelessWidget {
                   icon: Icons.play_arrow_rounded,
                   label: resumeLabel,
                   onPressed: onPlay,
+                  onRight: () => libraryFocus.requestFocus(),
                 ),
                 const SizedBox(width: 12),
                 _ActionButton(
@@ -512,6 +593,7 @@ class _ActionButton extends StatefulWidget {
     required this.onPressed,
     this.focusNode,
     this.autofocus = false,
+    this.onRight,
   });
 
   final Color accent;
@@ -521,6 +603,10 @@ class _ActionButton extends StatefulWidget {
   final VoidCallback onPressed;
   final FocusNode? focusNode;
   final bool autofocus;
+
+  /// Optional Right-key handoff (e.g. Play → Library) so the neighbouring
+  /// action stays reachable before the column-level Right escapes to episodes.
+  final VoidCallback? onRight;
 
   @override
   State<_ActionButton> createState() => _ActionButtonState();
@@ -543,6 +629,12 @@ class _ActionButtonState extends State<_ActionButton> {
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent && _isSelect(event.logicalKey)) {
           widget.onPressed();
+          return KeyEventResult.handled;
+        }
+        if (widget.onRight != null &&
+            (event is KeyDownEvent || event is KeyRepeatEvent) &&
+            event.logicalKey == LogicalKeyboardKey.arrowRight) {
+          widget.onRight!();
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
@@ -599,29 +691,18 @@ class _EpisodesPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = context.primaryColor;
-    // No panel surface — the list sits over the same backdrop as the left side
-    // (Netflix-style), with only a faint edge line hinting the column.
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(
-          left: BorderSide(
-            color: Theme.of(context).hintColor.withValues(alpha: 0.15),
-          ),
-        ),
-      ),
-      child: Column(
+    // No panel surface and no divider/edge line — the list sits over the same
+    // backdrop as the left side (Netflix-style) so the two columns read as one
+    // screen rather than a separate pane.
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
             child: Text(
               'Episodes  ·  ${episodes.length}',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
-          ),
-          Divider(
-            height: 1,
-            color: Theme.of(context).hintColor.withValues(alpha: 0.2),
           ),
           Expanded(
             child: loading
@@ -653,7 +734,6 @@ class _EpisodesPanel extends StatelessWidget {
                   ),
           ),
         ],
-      ),
     );
   }
 }
@@ -783,6 +863,100 @@ class _EpisodeRowState extends State<_EpisodeRow> {
                     color: Theme.of(context).hintColor,
                   ),
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The top bar's "…" overflow, rendered as a compact d-pad-navigable dialog.
+/// First row autofocuses; Up/Down move between rows; select fires the action
+/// (after closing the menu).
+class _MoreMenu extends StatelessWidget {
+  const _MoreMenu({required this.items});
+
+  final List<({IconData icon, String label, VoidCallback onTap})> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      content: SizedBox(
+        width: 300,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < items.length; i++)
+              _MoreMenuRow(item: items[i], autofocus: i == 0),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MoreMenuRow extends StatefulWidget {
+  const _MoreMenuRow({required this.item, required this.autofocus});
+
+  final ({IconData icon, String label, VoidCallback onTap}) item;
+  final bool autofocus;
+
+  @override
+  State<_MoreMenuRow> createState() => _MoreMenuRowState();
+}
+
+class _MoreMenuRowState extends State<_MoreMenuRow> {
+  bool _focused = false;
+
+  void _activate() {
+    Navigator.of(context).pop();
+    widget.item.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.primaryColor;
+    return Focus(
+      autofocus: widget.autofocus,
+      onFocusChange: (f) => setState(() => _focused = f),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && _isSelect(event.logicalKey)) {
+          _activate();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: _activate,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: _focused
+                ? accent.withValues(alpha: 0.18)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                widget.item.icon,
+                size: 20,
+                color: _focused
+                    ? accent
+                    : Theme.of(context).textTheme.bodyLarge!.color,
+              ),
+              const SizedBox(width: 14),
+              Text(
+                widget.item.label,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
         ),
