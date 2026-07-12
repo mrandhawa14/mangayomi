@@ -228,18 +228,13 @@ class _StartupErrorApp extends StatelessWidget {
 
 Future<void> _postLaunchInit(StorageProvider storage) async {
   await AppLogger.init();
-  // Netflix/YouTube-style: the heavy isolate spawns — the 6-isolate download
-  // pool plus (on TV) the crop/eval warm-ups — must not fire at first frame,
-  // where they'd starve the home's initial render on a low-RAM TV and stutter
-  // the loading UI. Give the UI a few seconds to render and settle first;
-  // nothing needs these isolates in the opening moments (all self-start on use).
-  Future.delayed(const Duration(seconds: 3), () {
-    unawaited(MDownloader.initializeIsolatePool(poolSize: 6));
-    if (isTv) {
-      unawaited(imgCropIsolate.start());
-      unawaited(getIsolateService.start());
-    }
-  });
+  // On TV these two were skipped before runApp to speed up launch; warm them in
+  // the background now so they're ready before the reader / browse need them.
+  if (isTv) {
+    unawaited(imgCropIsolate.start());
+    unawaited(getIsolateService.start());
+  }
+  unawaited(MDownloader.initializeIsolatePool(poolSize: 6));
   final hivePath = isApple ? "databases" : p.join("Mangayomi", "databases");
   await Hive.initFlutter(Platform.isAndroid ? "" : hivePath);
   Hive.registerAdapter(TrackSearchAdapter());
