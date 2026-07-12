@@ -173,6 +173,10 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
                 ),
                 Expanded(
                   child: Row(
+                    // Top-align both columns: without this the shorter left
+                    // column centres vertically while the full-height episode
+                    // list pins to the top, so the two sides start ~100px apart.
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(
                         flex: 42,
@@ -503,39 +507,41 @@ class _LeftInfo extends StatelessWidget {
                             color: Theme.of(context).hintColor,
                           ),
                         ),
-                      if (genres.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            for (final g in genres.take(6))
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: accent.withValues(alpha: 0.14),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  g,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: accent,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
                     ],
                   ),
                 ),
               ],
             ),
+            // Genre tags — a full-width row under the poster/title block so they
+            // aren't cramped into the narrow column beside the poster.
+            if (genres.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final g in genres.take(8))
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        g,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: accent,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
             const SizedBox(height: 20),
             Row(
               children: [
