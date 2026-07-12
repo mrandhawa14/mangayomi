@@ -46,6 +46,23 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
     super.dispose();
   }
 
+  // Exit the detail on the remote's Back — on some Fire TV remotes it arrives as
+  // a `goBack` key event that gets swallowed rather than falling through to the
+  // system back. Consuming it here pops the route (and prevents a double pop).
+  KeyEventResult _onKeyBack(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent) {
+      final k = event.logicalKey;
+      if (k == LogicalKeyboardKey.goBack ||
+          k == LogicalKeyboardKey.escape ||
+          k == LogicalKeyboardKey.browserBack ||
+          k == LogicalKeyboardKey.gameButtonB) {
+        Navigator.maybePop(context);
+        return KeyEventResult.handled;
+      }
+    }
+    return KeyEventResult.ignored;
+  }
+
   Future<void> _refresh() async {
     if (_refreshing) return;
     setState(() => _refreshing = true);
@@ -110,7 +127,11 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
       }
     });
 
-    return Scaffold(
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: _onKeyBack,
+      child: Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -191,6 +212,7 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
