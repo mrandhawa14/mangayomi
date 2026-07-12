@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/chapter.dart';
@@ -10,6 +11,8 @@ import 'package:mangayomi/models/history.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/library/widgets/library_entry_utils.dart';
 import 'package:mangayomi/modules/manga/detail/providers/isar_providers.dart';
+import 'package:mangayomi/modules/manga/detail/providers/update_manga_detail_providers.dart';
+import 'package:mangayomi/modules/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:mangayomi/utils/extensions/manga_extensions.dart';
@@ -29,13 +32,29 @@ class TvAnimeDetailView extends ConsumerStatefulWidget {
 
 class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
   final _playFocus = FocusNode(debugLabel: 'tvDetailPlay');
+  final _libraryFocus = FocusNode(debugLabel: 'tvDetailLibrary');
   final _episodesFocus = FocusNode(debugLabel: 'tvDetailEpisodes');
+  final _topBarFocus = FocusNode(debugLabel: 'tvDetailTopBar');
+  bool _refreshing = false;
 
   @override
   void dispose() {
     _playFocus.dispose();
+    _libraryFocus.dispose();
     _episodesFocus.dispose();
+    _topBarFocus.dispose();
     super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    if (_refreshing) return;
+    setState(() => _refreshing = true);
+    try {
+      await ref.read(
+        updateMangaDetailProvider(mangaId: manga.id, isInit: false).future,
+      );
+    } catch (_) {}
+    if (mounted) setState(() => _refreshing = false);
   }
 
   Manga get manga => widget.manga;
@@ -80,11 +99,13 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
 
     final cover = resolveCoverImage(manga, ref);
     final bg = Theme.of(context).scaffoldBackgroundColor;
-    final size = MediaQuery.sizeOf(context);
-    final episodesWidth = (size.width * 0.40).clamp(360.0, 560.0);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_playFocus.hasFocus && !_episodesFocus.hasFocus) {
+      if (mounted &&
+          !_playFocus.hasFocus &&
+          !_episodesFocus.hasFocus &&
+          !_libraryFocus.hasFocus &&
+          !_topBarFocus.hasFocus) {
         _playFocus.requestFocus();
       }
     });
@@ -93,46 +114,77 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Blurred, darkened backdrop from the cover.
+          // Blurred backdrop from the cover.
           ImageFiltered(
             imageFilter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
             child: Image(image: cover, fit: BoxFit.cover),
           ),
+          // Darken uniformly enough that text reads over any cover on both
+          // columns — so the episode list blends into the same backdrop instead
+          // of reading as a separate panel.
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
-                colors: [bg, bg.withValues(alpha: 0.86), bg.withValues(alpha: 0.4)],
-                stops: const [0.0, 0.5, 1.0],
+                colors: [
+                  bg,
+                  bg.withValues(alpha: 0.92),
+                  bg.withValues(alpha: 0.82),
+                ],
+                stops: const [0.0, 0.45, 1.0],
               ),
             ),
           ),
           SafeArea(
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: _LeftInfo(
-                    manga: manga,
-                    cover: cover,
-                    episodeCount: episodes.length,
-                    watched: watched,
-                    resume: resume,
-                    playFocus: _playFocus,
-                    onPlay: () => resume?.pushToReaderView(context),
-                    onExitRight: () => _episodesFocus.requestFocus(),
-                    onToggleLibrary: _toggleLibrary,
+                _TopBar(
+                  topBarFocus: _topBarFocus,
+                  refreshing: _refreshing,
+                  onBack: () => Navigator.maybePop(context),
+                  onRefresh: _refresh,
+                  onCategories: () => showCategorySelectionDialog(
+                    context: context,
+                    ref: ref,
+                    itemType: manga.itemType,
+                    singleManga: manga,
                   ),
+                  onMigrate: () => context.push('/migrate', extra: manga),
+                  onDown: () => _playFocus.requestFocus(),
                 ),
-                SizedBox(
-                  width: episodesWidth,
-                  child: _EpisodesPanel(
-                    episodes: episodes,
-                    resumeId: resume?.id,
-                    firstFocus: _episodesFocus,
-                    loading: !hasLive && episodes.isEmpty,
-                    onExitLeft: () => _playFocus.requestFocus(),
-                    onOpen: (c) => c.pushToReaderView(context, ignoreIsRead: true),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 42,
+                        child: _LeftInfo(
+                          manga: manga,
+                          cover: cover,
+                          episodeCount: episodes.length,
+                          watched: watched,
+                          resume: resume,
+                          playFocus: _playFocus,
+                          libraryFocus: _libraryFocus,
+                          onPlay: () => resume?.pushToReaderView(context),
+                          onExitRight: () => _episodesFocus.requestFocus(),
+                          onExitUp: () => _topBarFocus.requestFocus(),
+                          onToggleLibrary: _toggleLibrary,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 58,
+                        child: _EpisodesPanel(
+                          episodes: episodes,
+                          resumeId: resume?.id,
+                          firstFocus: _episodesFocus,
+                          loading: !hasLive && episodes.isEmpty,
+                          onExitLeft: () => _playFocus.requestFocus(),
+                          onOpen: (c) =>
+                              c.pushToReaderView(context, ignoreIsRead: true),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -156,6 +208,116 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
   }
 }
 
+/// Focusable top bar restoring the classic detail's actions (back, refresh,
+/// categories, migrate) that a touch-only app bar / pull-to-refresh dropped on
+/// TV. Down hands focus to the content below.
+class _TopBar extends StatelessWidget {
+  const _TopBar({
+    required this.topBarFocus,
+    required this.refreshing,
+    required this.onBack,
+    required this.onRefresh,
+    required this.onCategories,
+    required this.onMigrate,
+    required this.onDown,
+  });
+
+  final FocusNode topBarFocus;
+  final bool refreshing;
+  final VoidCallback onBack;
+  final VoidCallback onRefresh;
+  final VoidCallback onCategories;
+  final VoidCallback onMigrate;
+  final VoidCallback onDown;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: (node, event) {
+        if ((event is KeyDownEvent || event is KeyRepeatEvent) &&
+            event.logicalKey == LogicalKeyboardKey.arrowDown) {
+          onDown();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+        child: Row(
+          children: [
+            _TopBarButton(
+              focusNode: topBarFocus,
+              icon: Icons.arrow_back,
+              onPressed: onBack,
+            ),
+            const Spacer(),
+            _TopBarButton(
+              icon: refreshing ? Icons.hourglass_empty : Icons.refresh,
+              onPressed: onRefresh,
+            ),
+            _TopBarButton(icon: Icons.label_outline, onPressed: onCategories),
+            _TopBarButton(icon: Icons.swap_horiz, onPressed: onMigrate),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopBarButton extends StatefulWidget {
+  const _TopBarButton({
+    required this.icon,
+    required this.onPressed,
+    this.focusNode,
+  });
+
+  final IconData icon;
+  final VoidCallback onPressed;
+  final FocusNode? focusNode;
+
+  @override
+  State<_TopBarButton> createState() => _TopBarButtonState();
+}
+
+class _TopBarButtonState extends State<_TopBarButton> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.primaryColor;
+    return Focus(
+      focusNode: widget.focusNode,
+      onFocusChange: (f) => setState(() => _focused = f),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && _isSelect(event.logicalKey)) {
+          widget.onPressed();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _focused ? accent : accent.withValues(alpha: 0.12),
+          ),
+          child: Icon(
+            widget.icon,
+            size: 22,
+            color: _focused ? Colors.white : accent,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _LeftInfo extends StatelessWidget {
   const _LeftInfo({
     required this.manga,
@@ -164,8 +326,10 @@ class _LeftInfo extends StatelessWidget {
     required this.watched,
     required this.resume,
     required this.playFocus,
+    required this.libraryFocus,
     required this.onPlay,
     required this.onExitRight,
+    required this.onExitUp,
     required this.onToggleLibrary,
   });
 
@@ -175,8 +339,10 @@ class _LeftInfo extends StatelessWidget {
   final int watched;
   final Chapter? resume;
   final FocusNode playFocus;
+  final FocusNode libraryFocus;
   final VoidCallback onPlay;
   final VoidCallback onExitRight;
+  final VoidCallback onExitUp;
   final VoidCallback onToggleLibrary;
 
   @override
@@ -201,15 +367,20 @@ class _LeftInfo extends StatelessWidget {
       canRequestFocus: false,
       skipTraversal: true,
       onKeyEvent: (node, event) {
-        if ((event is KeyDownEvent || event is KeyRepeatEvent) &&
-            event.logicalKey == LogicalKeyboardKey.arrowRight) {
-          onExitRight();
-          return KeyEventResult.handled;
+        if (event is KeyDownEvent || event is KeyRepeatEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+            onExitRight();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+            onExitUp();
+            return KeyEventResult.handled;
+          }
         }
         return KeyEventResult.ignored;
       },
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(28, 24, 20, 24),
+        padding: const EdgeInsets.fromLTRB(28, 20, 20, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -277,6 +448,7 @@ class _LeftInfo extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 _ActionButton(
+                  focusNode: libraryFocus,
                   accent: accent,
                   filled: false,
                   icon: favorite ? Icons.favorite : Icons.favorite_border,
@@ -405,19 +577,30 @@ class _EpisodesPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = context.primaryColor;
-    return Container(
-      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.55),
+    // No panel surface — the list sits over the same backdrop as the left side
+    // (Netflix-style), with only a faint edge line hinting the column.
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          left: BorderSide(
+            color: Theme.of(context).hintColor.withValues(alpha: 0.15),
+          ),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
             child: Text(
               'Episodes  ·  ${episodes.length}',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
           ),
-          const Divider(height: 1),
+          Divider(
+            height: 1,
+            color: Theme.of(context).hintColor.withValues(alpha: 0.2),
+          ),
           Expanded(
             child: loading
                 ? const SizedBox.shrink()
