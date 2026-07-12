@@ -26,7 +26,6 @@ import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
 import 'package:mangayomi/modules/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
-import 'package:mangayomi/modules/widgets/progress_center.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
@@ -188,6 +187,16 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
     return true;
   }
 
+  /// Synchronous read matching getAllMangaStreamProvider(categoryId: null) —
+  /// used to seed the first frame so the spinner never flashes for local data.
+  List<Manga> _favoriteAnimeSync() => isar.mangas
+      .filter()
+      .idIsNotNull()
+      .favoriteEqualTo(true)
+      .and()
+      .itemTypeEqualTo(ItemType.anime)
+      .findAllSync();
+
   @override
   Widget build(BuildContext context) {
     final animeAsync = ref.watch(
@@ -197,11 +206,18 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
       getMangaCategorieStreamProvider(itemType: ItemType.anime),
     );
 
+    if (animeAsync.hasError && !animeAsync.hasValue) {
+      return Scaffold(body: ErrorText(animeAsync.error!));
+    }
+    // Seed the first frame from a synchronous Isar read. A stream provider is
+    // AsyncLoading on its very first build — its fireImmediately value arrives a
+    // microtask later — so .when() would flash the spinner for one frame even
+    // though the (local) library data is available instantly. Reading it
+    // synchronously here means the first frame already has content.
+    final allAnime = animeAsync.valueOrNull ?? _favoriteAnimeSync();
     return Scaffold(
-      body: animeAsync.when(
-        loading: () => const ProgressCenter(),
-        error: (e, _) => ErrorText(e),
-        data: (allAnime) {
+      body: Builder(
+        builder: (context) {
           // A hidden category hides its entries, matching the library (a hidden
           // category has no tab, and its titles aren't "Default" either). A
           // title stays visible if it's uncategorised, or sits in at least one
