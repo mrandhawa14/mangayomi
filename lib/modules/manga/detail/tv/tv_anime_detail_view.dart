@@ -693,47 +693,72 @@ class _EpisodesPanel extends StatelessWidget {
     final accent = context.primaryColor;
     // No panel surface and no divider/edge line — the list sits over the same
     // backdrop as the left side (Netflix-style) so the two columns read as one
-    // screen rather than a separate pane.
-    return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-            child: Text(
-              'Episodes  ·  ${episodes.length}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-          ),
-          Expanded(
-            child: loading
-                ? const SizedBox.shrink()
-                : episodes.isEmpty
-                ? Center(
+    // screen. Cap the list to a comfortable reading width so watched checkmarks
+    // sit next to their titles instead of being flung to the screen edge on
+    // wide (desktop / large-TV) layouts — but never wider than the column, so
+    // it fills the narrower Fire TV column without overflowing.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final listWidth = constraints.maxWidth < 560.0
+            ? constraints.maxWidth
+            : 560.0;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: listWidth,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
                     child: Text(
-                      'No episodes yet',
-                      style: TextStyle(color: Theme.of(context).hintColor),
-                    ),
-                  )
-                : FocusTraversalGroup(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      itemCount: episodes.length,
-                      itemBuilder: (context, i) {
-                        final ep = episodes[i];
-                        return _EpisodeRow(
-                          accent: accent,
-                          episode: ep,
-                          index: i,
-                          isResume: ep.id != null && ep.id == resumeId,
-                          focusNode: i == 0 ? firstFocus : null,
-                          onOpen: () => onOpen(ep),
-                          onExitLeft: onExitLeft,
-                        );
-                      },
+                      'Episodes  ·  ${episodes.length}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-          ),
-        ],
+                  Expanded(
+                    child: loading
+                        ? const SizedBox.shrink()
+                        : episodes.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No episodes yet',
+                              style: TextStyle(
+                                color: Theme.of(context).hintColor,
+                              ),
+                            ),
+                          )
+                        : FocusTraversalGroup(
+                            child: ListView.builder(
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              itemCount: episodes.length,
+                              itemBuilder: (context, i) {
+                                final ep = episodes[i];
+                                return _EpisodeRow(
+                                  accent: accent,
+                                  episode: ep,
+                                  index: i,
+                                  isResume:
+                                      ep.id != null && ep.id == resumeId,
+                                  focusNode: i == 0 ? firstFocus : null,
+                                  onOpen: () => onOpen(ep),
+                                  onExitLeft: onExitLeft,
+                                );
+                              },
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            const Spacer(),
+          ],
+        );
+      },
     );
   }
 }
