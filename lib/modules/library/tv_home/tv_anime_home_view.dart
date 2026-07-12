@@ -25,7 +25,6 @@ import 'package:mangayomi/modules/more/providers/downloaded_only_state_provider.
 import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
 import 'package:mangayomi/modules/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
-import 'package:mangayomi/modules/widgets/error_text.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
@@ -206,15 +205,13 @@ class _TvAnimeHomeViewState extends ConsumerState<TvAnimeHomeView> {
       getMangaCategorieStreamProvider(itemType: ItemType.anime),
     );
 
-    if (animeAsync.hasError && !animeAsync.hasValue) {
-      return Scaffold(body: ErrorText(animeAsync.error!));
-    }
     // Seed the first frame from a synchronous Isar read. A stream provider is
     // AsyncLoading on its very first build — its fireImmediately value arrives a
-    // microtask later — so .when() would flash the spinner for one frame even
-    // though the (local) library data is available instantly. Reading it
-    // synchronously here means the first frame already has content.
-    final allAnime = animeAsync.valueOrNull ?? _favoriteAnimeSync();
+    // microtask later — so .when() flashed the spinner for one frame even though
+    // the (local) library data is available instantly. `asData` is null only on
+    // that first frame (a local Isar stream doesn't error), and the sync read
+    // covers it; the stream then drives live updates.
+    final allAnime = animeAsync.asData?.value ?? _favoriteAnimeSync();
     return Scaffold(
       body: Builder(
         builder: (context) {
