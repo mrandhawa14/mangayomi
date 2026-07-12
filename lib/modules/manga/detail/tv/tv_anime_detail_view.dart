@@ -801,6 +801,19 @@ class _EpisodeRowState extends State<_EpisodeRow> {
           ),
           child: Row(
             children: [
+              // Unwatched marker — an accent bar that fades to grey once the
+              // episode is read (the classic detail's left rail).
+              Container(
+                width: 3,
+                height: 34,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: watched
+                      ? Theme.of(context).hintColor.withValues(alpha: 0.3)
+                      : widget.accent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
               SizedBox(
                 width: 28,
                 child: widget.isResume
