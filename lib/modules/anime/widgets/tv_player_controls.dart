@@ -71,6 +71,10 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
   void initState() {
     super.initState();
     widget.revealControls.addListener(_reveal);
+    // Re-arm the hide timer on every key event (see _onAnyKey): a control's own
+    // handler consumes its key, so an ancestor Focus would never see it — a
+    // hardware-keyboard handler is the only spot that catches *all* presses.
+    HardwareKeyboard.instance.addHandler(_onAnyKey);
     _startHideTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _playFocus.requestFocus();
@@ -79,12 +83,23 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onAnyKey);
     widget.revealControls.removeListener(_reveal);
     _hideTimer?.cancel();
     _scope.dispose();
     _playFocus.dispose();
     _rootFocus.dispose();
     super.dispose();
+  }
+
+  // Keep the panel alive while the user is actually pressing keys: any key (a
+  // d-pad nudge, a held seek's repeats) restarts the hide countdown, so it never
+  // vanishes mid-interaction or steals focus off the seek bar. Returns false so
+  // the event still dispatches to whatever is focused. Skipped when a dialog is
+  // on top (that case is handled by _onHideTimer re-arming).
+  bool _onAnyKey(KeyEvent event) {
+    if (mounted && _visible && _isTopRoute) _startHideTimer();
+    return false;
   }
 
   // True while the player is the topmost route. When a dialog (speed / settings)
@@ -161,12 +176,18 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
           if (_visible) return KeyEventResult.ignored;
           if (event is KeyDownEvent || event is KeyRepeatEvent) {
             final k = event.logicalKey;
+            // OK while hidden reveals the panel *and* toggles play/pause, so a
+            // blind press does the obvious thing without a second keystroke.
+            if (event is KeyDownEvent && _isSelect(k)) {
+              _reveal();
+              widget.player.playOrPause();
+              return KeyEventResult.handled;
+            }
             final wake =
                 k == LogicalKeyboardKey.arrowUp ||
                 k == LogicalKeyboardKey.arrowDown ||
                 k == LogicalKeyboardKey.arrowLeft ||
-                k == LogicalKeyboardKey.arrowRight ||
-                _isSelect(k);
+                k == LogicalKeyboardKey.arrowRight;
             if (wake) {
               _reveal();
               return KeyEventResult.handled;
