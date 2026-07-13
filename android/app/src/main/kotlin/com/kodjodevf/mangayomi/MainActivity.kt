@@ -12,11 +12,108 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.graphics.Color
+import android.graphics.SurfaceTexture
+import android.media.MediaPlayer
 import android.os.Build
+import android.os.Bundle
+import android.os.Handler
 import android.net.Uri
+import android.view.Surface
+import android.view.TextureView
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import java.io.File
 
 class MainActivity: FlutterFragmentActivity() {
+
+    private var splashContainer: View? = null
+    private var splashPlayer: MediaPlayer? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // TV-only native splash: play a short branded clip over the Flutter view
+        // while the engine and first frame come up, covering the startup hang.
+        // It renders on the platform's own video surface, so it animates smoothly
+        // even while the Dart isolate is busy initialising (a Flutter-drawn video
+        // would stutter with it). Plays to the end, then reveals the app. Phones
+        // start fast enough not to need it, so it is gated to TV.
+        if (savedInstanceState == null && isTvDevice()) {
+            showSplashVideo()
+        }
+    }
+
+    private fun showSplashVideo() {
+        val container = FrameLayout(this)
+        // White backing matches the launch theme and the clip's own background,
+        // so there is no black flash before the first video frame.
+        container.setBackgroundColor(Color.WHITE)
+        val textureView = TextureView(this)
+        container.addView(
+            textureView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        addContentView(
+            container,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        splashContainer = container
+
+        textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+            override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
+                val mp = MediaPlayer.create(this@MainActivity, R.raw.startup_video)
+                if (mp == null) {
+                    removeSplashVideo()
+                    return
+                }
+                splashPlayer = mp
+                mp.setSurface(Surface(surface))
+                mp.setOnCompletionListener { removeSplashVideo() }
+                mp.setOnErrorListener { _, _, _ ->
+                    removeSplashVideo()
+                    true
+                }
+                try {
+                    mp.start()
+                } catch (e: Exception) {
+                    removeSplashVideo()
+                }
+            }
+
+            override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {}
+            override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean = true
+            override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
+        }
+
+        // Safety net: never let a stalled decode trap the app behind the splash.
+        Handler(mainLooper).postDelayed({ removeSplashVideo() }, 10000)
+    }
+
+    private fun removeSplashVideo() {
+        splashPlayer?.let {
+            try {
+                it.release()
+            } catch (e: Exception) {
+            }
+        }
+        splashPlayer = null
+        splashContainer?.let { c ->
+            (c.parent as? ViewGroup)?.removeView(c)
+        }
+        splashContainer = null
+    }
+
+    override fun onDestroy() {
+        removeSplashVideo()
+        super.onDestroy()
+    }
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

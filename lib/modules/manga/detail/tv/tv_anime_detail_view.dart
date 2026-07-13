@@ -193,7 +193,7 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
                   Expanded(
                     // Screen padding on both sides so nothing hugs the TV edge.
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 48),
+                      padding: const EdgeInsets.fromLTRB(48, 0, 48, 28),
                       child: Row(
                         // Both columns full height and top-aligned.
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -559,25 +559,11 @@ class _LeftInfo extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           // The remaining actions live in a bounded scroller (~4 visible) so the
-          // hero above stays put; a top/bottom alpha fade softens the clip so
-          // items dissolve at the edge instead of ending on a hard line.
+          // hero above stays put; arrowing down scrolls just this list.
           Flexible(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 220),
-              child: ShaderMask(
-                blendMode: BlendMode.dstIn,
-                shaderCallback: (rect) => const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black,
-                    Colors.black,
-                    Colors.transparent,
-                  ],
-                  stops: [0.0, 0.05, 0.93, 1.0],
-                ).createShader(rect),
-                child: SingleChildScrollView(
+              child: SingleChildScrollView(
                   child: Column(
                     children: [
                       _VActionButton(
@@ -629,7 +615,6 @@ class _LeftInfo extends StatelessWidget {
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
