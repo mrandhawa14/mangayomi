@@ -248,6 +248,12 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
   if (kDebugMode && Hive.box('tv_prefs').get('dev_force_tv') == true) {
     isTv = true;
   }
+  // Desktop tester builds pass --dart-define=FORCE_TV=true so the Android-TV UI
+  // runs on a Mac/PC (arrow-key nav), in a release build that runs without a
+  // debugger. Compile-time, so it's absent from normal builds.
+  if (const bool.fromEnvironment('FORCE_TV')) {
+    isTv = true;
+  }
   await openUpdateErrorsBox();
   await openLibraryPrefsBox();
   await openSavedSearchesBox();

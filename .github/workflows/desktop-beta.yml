@@ -1,0 +1,68 @@
+name: Desktop beta build
+
+# Release desktop builds for testers: macOS .dmg + Windows .zip, forced into the
+# Android-TV UI via --dart-define=FORCE_TV=true so the TV screens can be tried on
+# a Mac/PC with arrow keys. Release (not debug) so they run standalone — a debug
+# desktop build needs a debugger / the VS debug runtime. Tag-triggered
+# (desktop-beta-*); uploads artifacts to attach to the beta release afterwards.
+on:
+  push:
+    tags:
+      - "desktop-beta-*"
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-beta-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen
+      - name: Pub get
+        run: flutter pub get
+      - name: Build macOS (release, force-TV)
+        run: flutter build macos --release --dart-define=FORCE_TV=true
+      - name: Package .dmg
+        run: |
+          APP=$(ls -d build/macos/Build/Products/Release/*.app | head -1)
+          echo "Packaging $APP"
+          hdiutil create -volname "Mangayomi TV Beta" \
+            -srcfolder "$APP" -ov -format UDZO mangayomi-tvbeta-macos.dmg
+          ls -lah mangayomi-tvbeta-macos.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mangayomi-tvbeta-macos-dmg
+          path: mangayomi-tvbeta-macos.dmg
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen
+      - name: Pub get
+        run: flutter pub get
+      - name: Build Windows (release, force-TV)
+        run: flutter build windows --release --dart-define=FORCE_TV=true
+      - name: Zip Windows build
+        run: |
+          Set-Location -Path "build/windows/x64/runner/Release"
+          Compress-Archive -Path * -DestinationPath "$env:GITHUB_WORKSPACE/mangayomi-tvbeta-windows.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mangayomi-tvbeta-windows-zip
+          path: mangayomi-tvbeta-windows.zip
+          if-no-files-found: error
