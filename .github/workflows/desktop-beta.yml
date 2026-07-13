@@ -48,6 +48,13 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      # cargokit's symlink resolver (flutter_discord_rpc_fork) uses Get-Item,
+      # which can't read hidden folders — and the pub cache lives under the
+      # hidden %USERPROFILE%\AppData, so the Windows build fails with
+      # "Get-Item: Could not find item ...\AppData". Clear the hidden attribute.
+      - name: Un-hide AppData for cargokit
+        shell: pwsh
+        run: attrib -s -h "$env:USERPROFILE\AppData"
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
