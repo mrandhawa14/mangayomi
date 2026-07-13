@@ -170,7 +170,7 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
                   Expanded(
                     // Screen padding on both sides so nothing hugs the TV edge.
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 48),
                       child: Row(
                         // Both columns full height and top-aligned.
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -430,14 +430,15 @@ class _LeftInfo extends StatelessWidget {
         ? resumeWord
         : '$resumeWord  ·  $resumeName';
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(0, 16, 36, 28),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 20, 36, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Cover with the title to its right, aligned to the cover's bottom.
+          // Cover on the left with the title + meta + tags beside it, the whole
+          // block vertically centred against the cover.
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
@@ -449,60 +450,67 @@ class _LeftInfo extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 22),
               Expanded(
-                child: Text(
-                  manga.name ?? '',
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    height: 1.12,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      manga.name ?? '',
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        height: 1.12,
+                      ),
+                    ),
+                    if (metaBits.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        metaBits,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).hintColor,
+                        ),
+                      ),
+                    ],
+                    if (genres.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final g in genres.take(8))
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: accent.withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                g,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: accent,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          if (metaBits.isNotEmpty)
-            Text(
-              metaBits,
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).hintColor,
-              ),
-            ),
-          if (genres.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final g in genres.take(8))
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      g,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: accent,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
           if ((manga.description ?? '').isNotEmpty) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             Text(
               manga.description!,
               maxLines: 3,
@@ -516,61 +524,74 @@ class _LeftInfo extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 18),
-          // Vertical action list (the old overflow "…" items, inline). Right
-          // off any of them jumps to the episodes.
-          _VActionButton(
-            focusNode: playFocus,
-            autofocus: true,
-            accent: accent,
-            primary: true,
-            icon: Icons.play_arrow_rounded,
-            label: resumeLabel,
-            onPressed: onPlay,
-            onExitRight: onExitRight,
-            onExitUp: onExitUp,
-          ),
-          _VActionButton(
-            accent: accent,
-            icon: favorite ? Icons.favorite : Icons.favorite_border,
-            label: favorite ? 'In Library' : 'Add to Library',
-            onPressed: onToggleLibrary,
-            onExitRight: onExitRight,
-          ),
-          _VActionButton(
-            accent: accent,
-            icon: Icons.label_outline,
-            label: 'Categories',
-            onPressed: onCategories,
-            onExitRight: onExitRight,
-          ),
-          _VActionButton(
-            accent: accent,
-            icon: Icons.public,
-            label: 'Open in browser',
-            onPressed: onBrowser,
-            onExitRight: onExitRight,
-          ),
-          _VActionButton(
-            accent: accent,
-            icon: Icons.recommend_outlined,
-            label: 'Recommendations',
-            onPressed: onRecommendations,
-            onExitRight: onExitRight,
-          ),
-          _VActionButton(
-            accent: accent,
-            icon: Icons.format_list_numbered,
-            label: 'Watch order',
-            onPressed: onWatchOrder,
-            onExitRight: onExitRight,
-          ),
-          _VActionButton(
-            accent: accent,
-            icon: Icons.swap_horiz,
-            label: 'Migrate',
-            onPressed: onMigrate,
-            onExitRight: onExitRight,
+          const SizedBox(height: 16),
+          // Actions live in their own bounded scroller (~3 visible) so the hero
+          // above stays put; arrowing down scrolls just this list.
+          Flexible(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 190),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _VActionButton(
+                      focusNode: playFocus,
+                      autofocus: true,
+                      accent: accent,
+                      primary: true,
+                      icon: Icons.play_arrow_rounded,
+                      label: resumeLabel,
+                      onPressed: onPlay,
+                      onExitRight: onExitRight,
+                      onExitUp: onExitUp,
+                    ),
+                    _VActionButton(
+                      accent: accent,
+                      icon: favorite
+                          ? Icons.favorite
+                          : Icons.favorite_border,
+                      label: favorite ? 'In Library' : 'Add to Library',
+                      onPressed: onToggleLibrary,
+                      onExitRight: onExitRight,
+                    ),
+                    _VActionButton(
+                      accent: accent,
+                      icon: Icons.label_outline,
+                      label: 'Categories',
+                      onPressed: onCategories,
+                      onExitRight: onExitRight,
+                    ),
+                    _VActionButton(
+                      accent: accent,
+                      icon: Icons.public,
+                      label: 'Open in browser',
+                      onPressed: onBrowser,
+                      onExitRight: onExitRight,
+                    ),
+                    _VActionButton(
+                      accent: accent,
+                      icon: Icons.recommend_outlined,
+                      label: 'Recommendations',
+                      onPressed: onRecommendations,
+                      onExitRight: onExitRight,
+                    ),
+                    _VActionButton(
+                      accent: accent,
+                      icon: Icons.format_list_numbered,
+                      label: 'Watch order',
+                      onPressed: onWatchOrder,
+                      onExitRight: onExitRight,
+                    ),
+                    _VActionButton(
+                      accent: accent,
+                      icon: Icons.swap_horiz,
+                      label: 'Migrate',
+                      onPressed: onMigrate,
+                      onExitRight: onExitRight,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
