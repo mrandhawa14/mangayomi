@@ -35,14 +35,35 @@ class TvAnimeDetailView extends ConsumerStatefulWidget {
 }
 
 class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
-  final _playFocus = FocusNode(debugLabel: 'tvDetailPlay');
+  static const _actionCount = 7;
+  late final List<FocusNode> _actionFocus;
   final _episodesFocus = FocusNode(debugLabel: 'tvDetailEpisodes');
   final _topBarFocus = FocusNode(debugLabel: 'tvDetailTopBar');
+  // The action the user last sat on, so returning from the episodes (or after a
+  // rebuild) resumes there instead of snapping back to Continue every time.
+  int _lastAction = 0;
   bool _refreshing = false;
 
   @override
+  void initState() {
+    super.initState();
+    _actionFocus = List.generate(
+      _actionCount,
+      (i) => FocusNode(debugLabel: 'tvDetailAction$i'),
+    );
+    for (var i = 0; i < _actionFocus.length; i++) {
+      final node = _actionFocus[i];
+      node.addListener(() {
+        if (node.hasFocus) _lastAction = i;
+      });
+    }
+  }
+
+  @override
   void dispose() {
-    _playFocus.dispose();
+    for (final node in _actionFocus) {
+      node.dispose();
+    }
     _episodesFocus.dispose();
     _topBarFocus.dispose();
     super.dispose();
@@ -120,11 +141,13 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
     final bg = Theme.of(context).scaffoldBackgroundColor;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted &&
-          !_playFocus.hasFocus &&
-          !_episodesFocus.hasFocus &&
-          !_topBarFocus.hasFocus) {
-        _playFocus.requestFocus();
+      if (!mounted) return;
+      // Only claim focus if it genuinely landed nowhere — checking every action
+      // node (not just Continue) so a rebuild while the user is on a lower
+      // button doesn't snap focus back to the top of the list.
+      final onAction = _actionFocus.any((n) => n.hasFocus);
+      if (!onAction && !_episodesFocus.hasFocus && !_topBarFocus.hasFocus) {
+        _actionFocus[_lastAction].requestFocus();
       }
     });
 
@@ -165,7 +188,7 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
                     refreshing: _refreshing,
                     onBack: () => Navigator.maybePop(context),
                     onRefresh: _refresh,
-                    onDown: () => _playFocus.requestFocus(),
+                    onDown: () => _actionFocus[_lastAction].requestFocus(),
                   ),
                   Expanded(
                     // Screen padding on both sides so nothing hugs the TV edge.
@@ -183,7 +206,7 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
                               episodeCount: episodes.length,
                               watched: watched,
                               resume: resume,
-                              playFocus: _playFocus,
+                              actionFocus: _actionFocus,
                               onPlay: () => resume?.pushToReaderView(context),
                               onToggleLibrary: _toggleLibrary,
                               onCategories: () => showCategorySelectionDialog(
@@ -218,7 +241,8 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
                               resumeId: resume?.id,
                               firstFocus: _episodesFocus,
                               loading: !hasLive && episodes.isEmpty,
-                              onExitLeft: () => _playFocus.requestFocus(),
+                              onExitLeft: () =>
+                                  _actionFocus[_lastAction].requestFocus(),
                               onOpen: (c) => c.pushToReaderView(
                                 context,
                                 ignoreIsRead: true,
@@ -379,7 +403,7 @@ class _LeftInfo extends StatelessWidget {
     required this.episodeCount,
     required this.watched,
     required this.resume,
-    required this.playFocus,
+    required this.actionFocus,
     required this.onPlay,
     required this.onToggleLibrary,
     required this.onCategories,
@@ -396,7 +420,7 @@ class _LeftInfo extends StatelessWidget {
   final int episodeCount;
   final int watched;
   final Chapter? resume;
-  final FocusNode playFocus;
+  final List<FocusNode> actionFocus;
   final VoidCallback onPlay;
   final VoidCallback onToggleLibrary;
   final VoidCallback onCategories;
@@ -525,70 +549,92 @@ class _LeftInfo extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 16),
-          // Actions live in their own bounded scroller (~3 visible) so the hero
-          // above stays put; arrowing down scrolls just this list.
+          // Actions live in their own bounded scroller (~4 visible) so the hero
+          // above stays put; arrowing down scrolls just this list. A top/bottom
+          // alpha fade softens the clip so items dissolve at the edge instead of
+          // ending on a hard line.
           Flexible(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 190),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    _VActionButton(
-                      focusNode: playFocus,
-                      autofocus: true,
-                      accent: accent,
-                      primary: true,
-                      icon: Icons.play_arrow_rounded,
-                      label: resumeLabel,
-                      onPressed: onPlay,
-                      onExitRight: onExitRight,
-                      onExitUp: onExitUp,
-                    ),
-                    _VActionButton(
-                      accent: accent,
-                      icon: favorite
-                          ? Icons.favorite
-                          : Icons.favorite_border,
-                      label: favorite ? 'In Library' : 'Add to Library',
-                      onPressed: onToggleLibrary,
-                      onExitRight: onExitRight,
-                    ),
-                    _VActionButton(
-                      accent: accent,
-                      icon: Icons.label_outline,
-                      label: 'Categories',
-                      onPressed: onCategories,
-                      onExitRight: onExitRight,
-                    ),
-                    _VActionButton(
-                      accent: accent,
-                      icon: Icons.public,
-                      label: 'Open in browser',
-                      onPressed: onBrowser,
-                      onExitRight: onExitRight,
-                    ),
-                    _VActionButton(
-                      accent: accent,
-                      icon: Icons.recommend_outlined,
-                      label: 'Recommendations',
-                      onPressed: onRecommendations,
-                      onExitRight: onExitRight,
-                    ),
-                    _VActionButton(
-                      accent: accent,
-                      icon: Icons.format_list_numbered,
-                      label: 'Watch order',
-                      onPressed: onWatchOrder,
-                      onExitRight: onExitRight,
-                    ),
-                    _VActionButton(
-                      accent: accent,
-                      icon: Icons.swap_horiz,
-                      label: 'Migrate',
-                      onPressed: onMigrate,
-                      onExitRight: onExitRight,
-                    ),
+              constraints: const BoxConstraints(maxHeight: 250),
+              child: ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (rect) => const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black,
+                    Colors.black,
+                    Colors.transparent,
                   ],
+                  stops: [0.0, 0.05, 0.93, 1.0],
+                ).createShader(rect),
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _VActionButton(
+                        focusNode: actionFocus[0],
+                        autofocus: true,
+                        accent: accent,
+                        primary: true,
+                        icon: Icons.play_arrow_rounded,
+                        label: resumeLabel,
+                        onPressed: onPlay,
+                        onExitRight: onExitRight,
+                        onExitUp: onExitUp,
+                      ),
+                      _VActionButton(
+                        focusNode: actionFocus[1],
+                        accent: accent,
+                        icon: favorite
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        label: favorite ? 'In Library' : 'Add to Library',
+                        onPressed: onToggleLibrary,
+                        onExitRight: onExitRight,
+                      ),
+                      _VActionButton(
+                        focusNode: actionFocus[2],
+                        accent: accent,
+                        icon: Icons.label_outline,
+                        label: 'Categories',
+                        onPressed: onCategories,
+                        onExitRight: onExitRight,
+                      ),
+                      _VActionButton(
+                        focusNode: actionFocus[3],
+                        accent: accent,
+                        icon: Icons.public,
+                        label: 'Open in browser',
+                        onPressed: onBrowser,
+                        onExitRight: onExitRight,
+                      ),
+                      _VActionButton(
+                        focusNode: actionFocus[4],
+                        accent: accent,
+                        icon: Icons.recommend_outlined,
+                        label: 'Recommendations',
+                        onPressed: onRecommendations,
+                        onExitRight: onExitRight,
+                      ),
+                      _VActionButton(
+                        focusNode: actionFocus[5],
+                        accent: accent,
+                        icon: Icons.format_list_numbered,
+                        label: 'Watch order',
+                        onPressed: onWatchOrder,
+                        onExitRight: onExitRight,
+                      ),
+                      _VActionButton(
+                        focusNode: actionFocus[6],
+                        accent: accent,
+                        icon: Icons.swap_horiz,
+                        label: 'Migrate',
+                        onPressed: onMigrate,
+                        onExitRight: onExitRight,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
