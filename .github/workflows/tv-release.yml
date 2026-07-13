@@ -60,6 +60,9 @@ jobs:
           echo "org.gradle.jvmargs=-Xmx4096M -XX:MaxMetaspaceSize=512m -XX:+UseG1GC" >> android/gradle.properties
           echo "org.gradle.parallel=true" >> android/gradle.properties
           echo "org.gradle.daemon=false" >> android/gradle.properties
+          # Build the beta as a side-by-side app (own applicationId + provider
+          # authority + label) so it installs alongside the official Mangayomi.
+          echo "tvBeta=true" >> android/gradle.properties
 
       - name: Setup cmake
         uses: jwlawson/actions-setup-cmake@v2
@@ -119,6 +122,14 @@ jobs:
           export GRADLE_OPTS="-Xmx4096m -XX:MaxMetaspaceSize=512m -XX:+UseG1GC"
           flutter build apk --release
 
+      # Confirm the beta identity in the log: package id should be
+      # ...mangayomi.tvbeta and the label "Mangayomi TV Beta" (side-by-side).
+      - name: Verify beta package id + label
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          "$BT/aapt2" dump badging "$APK" 2>/dev/null | grep -E "package: name|application-label:" || true
+
       - name: Stage APK + notes
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk "mangayomi-${{ github.ref_name }}.apk"
@@ -126,7 +137,7 @@ jobs:
           cat > release_notes.md <<'EOF'
           **Android TV beta** — sideload build for testers.
 
-          Install the APK on your Fire TV / Android TV (enable "install unknown apps" for your file manager / Downloader). Fat APK — one file for `arm64-v8a`, `armeabi-v7a` and `x86_64`.
+          Installs as a **separate app ("Mangayomi TV Beta")** alongside any existing Mangayomi — no need to uninstall anything. Install the APK on your Fire TV / Android TV (enable "install unknown apps" for your file manager / Downloader). Fat APK — one file for `arm64-v8a`, `armeabi-v7a` and `x86_64`.
 
           ### What's new
           - New TV anime **detail screen**: split hero + episode list, vertical action menu, pinned Continue, genre tags, per-episode unwatched bars.

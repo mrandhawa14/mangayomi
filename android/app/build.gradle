@@ -56,6 +56,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Launcher label via placeholder so a side-by-side beta can rename it
+        // without affecting normal builds (see the tvBeta block below).
+        manifestPlaceholders = [appLabel: "Mangayomi"]
     }
 
     packagingOptions {
@@ -75,6 +78,15 @@ android {
    buildTypes {
        release {
            signingConfig signingConfigs.release
+           // Beta channel only (CI passes -PtvBeta): give the app its own
+           // applicationId + FileProvider authority + label so it installs
+           // side-by-side with the official Mangayomi instead of colliding
+           // (signature mismatch / conflicting provider). Normal release builds
+           // are untouched.
+           if (project.hasProperty("tvBeta")) {
+               applicationIdSuffix ".tvbeta"
+               manifestPlaceholders = [appLabel: "Mangayomi TV Beta"]
+           }
        }
    }
    repositories {
