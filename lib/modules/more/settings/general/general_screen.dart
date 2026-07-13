@@ -60,7 +60,7 @@ class _GeneralStateScreen extends ConsumerState<GeneralScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            if (kDebugMode)
+            if (kDebugMode || const bool.fromEnvironment('ALLOW_FORCE_TV'))
               SwitchListTile(
                 secondary: const Icon(Icons.tv_outlined),
                 title: const Text('Force TV mode (dev)'),

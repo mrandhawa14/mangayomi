@@ -245,13 +245,13 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
   // Dev-only: let any device force TV mode so the Android TV UI can be tested
   // with a keyboard / arrow keys without a real TV. Read once the prefs box is
   // open; gated to debug builds so it never ships in release.
-  if (kDebugMode && Hive.box('tv_prefs').get('dev_force_tv') == true) {
-    isTv = true;
-  }
-  // Desktop tester builds pass --dart-define=FORCE_TV=true so the Android-TV UI
-  // runs on a Mac/PC (arrow-key nav), in a release build that runs without a
-  // debugger. Compile-time, so it's absent from normal builds.
-  if (const bool.fromEnvironment('FORCE_TV')) {
+  // The "Force TV mode" toggle normally only works in debug. Desktop tester
+  // builds pass --dart-define=ALLOW_FORCE_TV=true so it also works in a release
+  // build — testers flip the toggle (Settings › General) and restart to try the
+  // Android-TV UI on a Mac/PC with arrow keys. Compile-time flag, so normal
+  // release builds are unaffected.
+  if ((kDebugMode || const bool.fromEnvironment('ALLOW_FORCE_TV')) &&
+      Hive.box('tv_prefs').get('dev_force_tv') == true) {
     isTv = true;
   }
   await openUpdateErrorsBox();
