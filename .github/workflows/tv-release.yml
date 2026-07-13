@@ -1,0 +1,157 @@
+name: TV Release Build
+
+# Builds a SIGNED RELEASE fat APK (AOT — far smaller/faster than the debug
+# artifact) and publishes it as a GitHub pre-release, for handing to testers.
+#
+# Triggered by pushing a tag like `tv-beta-0.7.80`. Tag-triggered workflows run
+# from the tagged commit, so this works off the tv-test-build branch without
+# living on the default branch. Signing uses a throwaway beta keystore kept only
+# as repo secrets (TV_BETA_*), never committed.
+on:
+  push:
+    tags:
+      - "tv-beta-*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tv-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Build + publish release APK (all ABIs)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Reclaim ~15 GB of preinstalled tooling we don't use so the fat all-ABIs
+      # build + caches fit the runner disk (mirrors tv-build.yml).
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost \
+                      /opt/hostedtoolcache/CodeQL /usr/local/graalvm \
+                      /usr/local/.ghcup || true
+          sudo docker image prune --all --force || true
+          df -h /
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Java toolchain
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+        env:
+          JAVA_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=512m"
+
+      - name: Setup Gradle properties for CI
+        run: |
+          echo "org.gradle.jvmargs=-Xmx4096M -XX:MaxMetaspaceSize=512m -XX:+UseG1GC" >> android/gradle.properties
+          echo "org.gradle.parallel=true" >> android/gradle.properties
+          echo "org.gradle.daemon=false" >> android/gradle.properties
+
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: "3.18.1"
+
+      - name: Setup ninja
+        uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Cache flutter_rust_bridge_codegen
+        id: cache-frb
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/flutter_rust_bridge_codegen
+          key: frb-codegen-${{ runner.os }}-v1
+
+      - name: Install flutter_rust_bridge_codegen
+        if: steps.cache-frb.outputs.cache-hit != 'true'
+        run: cargo install flutter_rust_bridge_codegen
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Decode the beta keystore from secrets and point the existing release
+      # signingConfig (build.gradle reads android/key.properties) at it. Nothing
+      # here is committed; the .jks + key.properties exist only on the runner.
+      - name: Restore signing keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.TV_BETA_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.TV_BETA_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.TV_BETA_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.TV_BETA_KEY_ALIAS }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 --decode > android/app/tv-beta-keystore.jks
+          cat > android/key.properties <<EOF
+          storeFile=tv-beta-keystore.jks
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      # Fat release APK (armeabi-v7a + arm64-v8a + x86_64). AOT-compiled, so far
+      # smaller and faster than the debug artifact; no minify is configured, so
+      # there's no R8 stripping risk.
+      - name: Build release APK (all ABIs)
+        run: |
+          export GRADLE_OPTS="-Xmx4096m -XX:MaxMetaspaceSize=512m -XX:+UseG1GC"
+          flutter build apk --release
+
+      - name: Stage APK + notes
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk "mangayomi-${{ github.ref_name }}.apk"
+          ls -lh "mangayomi-${{ github.ref_name }}.apk"
+          cat > release_notes.md <<'EOF'
+          **Android TV beta** — sideload build for testers.
+
+          Install the APK on your Fire TV / Android TV (enable "install unknown apps" for your file manager / Downloader). Fat APK — one file for `arm64-v8a`, `armeabi-v7a` and `x86_64`.
+
+          ### What's new
+          - New TV anime **detail screen**: split hero + episode list, vertical action menu, pinned Continue, genre tags, per-episode unwatched bars.
+          - **Native startup splash** to cover the launch hang.
+          - **Player fixes**: controls stay up while you're pressing keys; holding seek no longer jumps focus to Play; OK while controls are hidden reveals + pauses.
+
+          ### Please report
+          - Any focus that gets stuck or lost with the remote.
+          - Startup splash glitches (black flash, or video appearing behind the app).
+          EOF
+
+      - name: Publish pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            "mangayomi-${{ github.ref_name }}.apk" \
+            --repo "${{ github.repository }}" \
+            --title "Mangayomi Android TV — ${{ github.ref_name }}" \
+            --notes-file release_notes.md \
+            --prerelease
+
+      - name: Upload APK artifact (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mangayomi-tv-release-apk
+          path: mangayomi-${{ github.ref_name }}.apk
+          if-no-files-found: error
