@@ -37,7 +37,7 @@ class TvAnimeDetailView extends ConsumerStatefulWidget {
 class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
   static const _actionCount = 7;
   late final List<FocusNode> _actionFocus;
-  final _episodesFocus = FocusNode(debugLabel: 'tvDetailEpisodes');
+  final _rootFocus = FocusNode(debugLabel: 'tvDetailRoot');
   final _topBarFocus = FocusNode(debugLabel: 'tvDetailTopBar');
   // The action the user last sat on, so returning from the episodes (or after a
   // rebuild) resumes there instead of snapping back to Continue every time.
@@ -64,7 +64,7 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
     for (final node in _actionFocus) {
       node.dispose();
     }
-    _episodesFocus.dispose();
+    _rootFocus.dispose();
     _topBarFocus.dispose();
     super.dispose();
   }
@@ -141,17 +141,17 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
     final bg = Theme.of(context).scaffoldBackgroundColor;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      // Only claim focus if it genuinely landed nowhere — checking every action
-      // node (not just Continue) so a rebuild while the user is on a lower
-      // button doesn't snap focus back to the top of the list.
-      final onAction = _actionFocus.any((n) => n.hasFocus);
-      if (!onAction && !_episodesFocus.hasFocus && !_topBarFocus.hasFocus) {
+      // Claim focus only if it landed nowhere in the detail at all (initial
+      // frame, or after a pushed route / dialog returns). Checking the root
+      // node's whole subtree — not individual nodes — so focus deep in the lazy
+      // episode list never reads as "nowhere" and gets yanked back.
+      if (mounted && !_rootFocus.hasFocus) {
         _actionFocus[_lastAction].requestFocus();
       }
     });
 
     return Focus(
+      focusNode: _rootFocus,
       canRequestFocus: false,
       skipTraversal: true,
       onKeyEvent: _onKeyBack,
@@ -230,7 +230,6 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
                               ),
                               onMigrate: () =>
                                   context.push('/migrate', extra: manga),
-                              onExitRight: () => _episodesFocus.requestFocus(),
                               onExitUp: () => _topBarFocus.requestFocus(),
                             ),
                           ),
@@ -239,7 +238,6 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
                             child: _EpisodesPanel(
                               episodes: episodes,
                               resumeId: resume?.id,
-                              firstFocus: _episodesFocus,
                               loading: !hasLive && episodes.isEmpty,
                               onExitLeft: () =>
                                   _actionFocus[_lastAction].requestFocus(),
@@ -411,7 +409,6 @@ class _LeftInfo extends StatelessWidget {
     required this.onRecommendations,
     required this.onWatchOrder,
     required this.onMigrate,
-    required this.onExitRight,
     required this.onExitUp,
   });
 
@@ -428,7 +425,6 @@ class _LeftInfo extends StatelessWidget {
   final VoidCallback onRecommendations;
   final VoidCallback onWatchOrder;
   final VoidCallback onMigrate;
-  final VoidCallback onExitRight;
   final VoidCallback onExitUp;
 
   @override
@@ -549,13 +545,25 @@ class _LeftInfo extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 16),
-          // Actions live in their own bounded scroller (~4 visible) so the hero
-          // above stays put; arrowing down scrolls just this list. A top/bottom
-          // alpha fade softens the clip so items dissolve at the edge instead of
-          // ending on a hard line.
+          // Continue is pinned above the scroller: the primary action is always
+          // visible and never fades (Apple-Timer-style fixed primary button).
+          _VActionButton(
+            focusNode: actionFocus[0],
+            autofocus: true,
+            accent: accent,
+            primary: true,
+            icon: Icons.play_arrow_rounded,
+            label: resumeLabel,
+            onPressed: onPlay,
+            onExitUp: onExitUp,
+          ),
+          const SizedBox(height: 4),
+          // The remaining actions live in a bounded scroller (~4 visible) so the
+          // hero above stays put; a top/bottom alpha fade softens the clip so
+          // items dissolve at the edge instead of ending on a hard line.
           Flexible(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 250),
+              constraints: const BoxConstraints(maxHeight: 220),
               child: ShaderMask(
                 blendMode: BlendMode.dstIn,
                 shaderCallback: (rect) => const LinearGradient(
@@ -573,17 +581,6 @@ class _LeftInfo extends StatelessWidget {
                   child: Column(
                     children: [
                       _VActionButton(
-                        focusNode: actionFocus[0],
-                        autofocus: true,
-                        accent: accent,
-                        primary: true,
-                        icon: Icons.play_arrow_rounded,
-                        label: resumeLabel,
-                        onPressed: onPlay,
-                        onExitRight: onExitRight,
-                        onExitUp: onExitUp,
-                      ),
-                      _VActionButton(
                         focusNode: actionFocus[1],
                         accent: accent,
                         icon: favorite
@@ -591,7 +588,6 @@ class _LeftInfo extends StatelessWidget {
                             : Icons.favorite_border,
                         label: favorite ? 'In Library' : 'Add to Library',
                         onPressed: onToggleLibrary,
-                        onExitRight: onExitRight,
                       ),
                       _VActionButton(
                         focusNode: actionFocus[2],
@@ -599,7 +595,6 @@ class _LeftInfo extends StatelessWidget {
                         icon: Icons.label_outline,
                         label: 'Categories',
                         onPressed: onCategories,
-                        onExitRight: onExitRight,
                       ),
                       _VActionButton(
                         focusNode: actionFocus[3],
@@ -607,7 +602,6 @@ class _LeftInfo extends StatelessWidget {
                         icon: Icons.public,
                         label: 'Open in browser',
                         onPressed: onBrowser,
-                        onExitRight: onExitRight,
                       ),
                       _VActionButton(
                         focusNode: actionFocus[4],
@@ -615,7 +609,6 @@ class _LeftInfo extends StatelessWidget {
                         icon: Icons.recommend_outlined,
                         label: 'Recommendations',
                         onPressed: onRecommendations,
-                        onExitRight: onExitRight,
                       ),
                       _VActionButton(
                         focusNode: actionFocus[5],
@@ -623,7 +616,6 @@ class _LeftInfo extends StatelessWidget {
                         icon: Icons.format_list_numbered,
                         label: 'Watch order',
                         onPressed: onWatchOrder,
-                        onExitRight: onExitRight,
                       ),
                       _VActionButton(
                         focusNode: actionFocus[6],
@@ -631,7 +623,6 @@ class _LeftInfo extends StatelessWidget {
                         icon: Icons.swap_horiz,
                         label: 'Migrate',
                         onPressed: onMigrate,
-                        onExitRight: onExitRight,
                       ),
                     ],
                   ),
@@ -656,7 +647,6 @@ class _VActionButton extends StatefulWidget {
     required this.icon,
     required this.label,
     required this.onPressed,
-    required this.onExitRight,
     this.focusNode,
     this.autofocus = false,
     this.primary = false,
@@ -667,7 +657,6 @@ class _VActionButton extends StatefulWidget {
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
-  final VoidCallback onExitRight;
   final FocusNode? focusNode;
   final bool autofocus;
   final bool primary;
@@ -704,7 +693,10 @@ class _VActionButtonState extends State<_VActionButton> {
         }
         if (event is KeyDownEvent || event is KeyRepeatEvent) {
           if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-            widget.onExitRight();
+            // Cross into the episode list by direction so focus lands on a
+            // currently-visible row rather than a fixed (possibly scrolled-off)
+            // one, which would silently drop focus.
+            node.focusInDirection(TraversalDirection.right);
             return KeyEventResult.handled;
           }
           if (widget.onExitUp != null &&
@@ -757,7 +749,6 @@ class _EpisodesPanel extends StatelessWidget {
   const _EpisodesPanel({
     required this.episodes,
     required this.resumeId,
-    required this.firstFocus,
     required this.loading,
     required this.onExitLeft,
     required this.onOpen,
@@ -765,7 +756,6 @@ class _EpisodesPanel extends StatelessWidget {
 
   final List<Chapter> episodes;
   final int? resumeId;
-  final FocusNode firstFocus;
   final bool loading;
   final VoidCallback onExitLeft;
   final ValueChanged<Chapter> onOpen;
@@ -826,7 +816,6 @@ class _EpisodesPanel extends StatelessWidget {
                                   index: i,
                                   isResume:
                                       ep.id != null && ep.id == resumeId,
-                                  focusNode: i == 0 ? firstFocus : null,
                                   onOpen: () => onOpen(ep),
                                   onExitLeft: onExitLeft,
                                 );
@@ -851,7 +840,6 @@ class _EpisodeRow extends StatefulWidget {
     required this.episode,
     required this.index,
     required this.isResume,
-    required this.focusNode,
     required this.onOpen,
     required this.onExitLeft,
   });
@@ -860,7 +848,6 @@ class _EpisodeRow extends StatefulWidget {
   final Chapter episode;
   final int index;
   final bool isResume;
-  final FocusNode? focusNode;
   final VoidCallback onOpen;
   final VoidCallback onExitLeft;
 
@@ -880,7 +867,6 @@ class _EpisodeRowState extends State<_EpisodeRow> {
         ? 'Episode ${widget.index + 1}'
         : ep.name!.trim();
     return Focus(
-      focusNode: widget.focusNode,
       onFocusChange: (f) => setState(() => _focused = f),
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent || event is KeyRepeatEvent) {
@@ -921,22 +907,12 @@ class _EpisodeRowState extends State<_EpisodeRow> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              SizedBox(
-                width: 28,
-                child: widget.isResume
-                    ? Icon(Icons.play_arrow_rounded, color: widget.accent)
-                    : Text(
-                        '${widget.index + 1}',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: watched
-                              ? Theme.of(context).hintColor
-                              : null,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-              ),
-              const SizedBox(width: 10),
+              // The title already reads "Episode N", so no leading number —
+              // just a play marker on the resume episode.
+              if (widget.isResume) ...[
+                Icon(Icons.play_arrow_rounded, color: widget.accent, size: 20),
+                const SizedBox(width: 10),
+              ],
               Expanded(
                 child: Text(
                   title,
