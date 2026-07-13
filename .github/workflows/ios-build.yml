@@ -1,6 +1,8 @@
 # Dev-only unsigned iOS build so the app can be sideloaded onto an iPhone/iPad
 # (AltStore / Sideloadly / TrollStore) for testing — no paid signing in CI.
-# Debug build, --no-codesign, packaged into an .ipa. Not for distribution.
+# RELEASE (AOT) build, --no-codesign, packaged into an .ipa. Release matters:
+# a debug iOS build runs the Dart VM in JIT and needs a live debugger, so a
+# sideloaded debug .ipa crashes instantly on launch. Not for distribution.
 name: iOS dev build
 
 on:
@@ -40,8 +42,8 @@ jobs:
         run: flutter pub get
 
       # .g.dart is committed, so no build_runner needed.
-      - name: Build iOS (debug, unsigned)
-        run: flutter build ios --debug --no-codesign
+      - name: Build iOS (release, unsigned)
+        run: flutter build ios --release --no-codesign
 
       - name: Package unsigned .ipa
         run: |
