@@ -19,6 +19,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.net.Uri
+import android.view.Gravity
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
@@ -50,13 +51,14 @@ class MainActivity: FlutterFragmentActivity() {
         // so there is no black flash before the first video frame.
         container.setBackgroundColor(Color.WHITE)
         val textureView = TextureView(this)
-        container.addView(
-            textureView,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ),
-        )
+        // Show the clip at ~1/3 screen size, centred on the white backing,
+        // rather than full-bleed — the logo reads as a small centred mark.
+        val metrics = resources.displayMetrics
+        val videoWidth = metrics.widthPixels / 3
+        val videoHeight = videoWidth * 9 / 16
+        val lp = FrameLayout.LayoutParams(videoWidth, videoHeight)
+        lp.gravity = Gravity.CENTER
+        container.addView(textureView, lp)
         addContentView(
             container,
             ViewGroup.LayoutParams(
