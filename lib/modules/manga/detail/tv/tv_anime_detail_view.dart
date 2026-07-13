@@ -20,10 +20,11 @@ import 'package:mangayomi/utils/extensions/manga_extensions.dart';
 import 'package:mangayomi/utils/extensions/string_extensions.dart';
 import 'package:mangayomi/utils/utils.dart';
 
-/// TV-only, d-pad-first anime detail. A split view echoing the player settings
-/// panel: everything about the title on the left (backdrop, poster, meta, the
-/// Play/Continue + Library actions, synopsis) and the episode list on the right.
-/// Reached only when `isTv` and the entry is anime.
+/// TV-only, d-pad-first anime detail. Equal split, screen-padded: the hero
+/// (cover, title, meta, synopsis) and a vertical list of actions on the left,
+/// the episode list on the right. Right from any action hands off to the
+/// episodes; Left from the episodes returns to the actions. Reached only when
+/// `isTv` and the entry is anime.
 class TvAnimeDetailView extends ConsumerStatefulWidget {
   const TvAnimeDetailView({super.key, required this.manga});
 
@@ -35,7 +36,6 @@ class TvAnimeDetailView extends ConsumerStatefulWidget {
 
 class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
   final _playFocus = FocusNode(debugLabel: 'tvDetailPlay');
-  final _libraryFocus = FocusNode(debugLabel: 'tvDetailLibrary');
   final _episodesFocus = FocusNode(debugLabel: 'tvDetailEpisodes');
   final _topBarFocus = FocusNode(debugLabel: 'tvDetailTopBar');
   bool _refreshing = false;
@@ -43,7 +43,6 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
   @override
   void dispose() {
     _playFocus.dispose();
-    _libraryFocus.dispose();
     _episodesFocus.dispose();
     _topBarFocus.dispose();
     super.dispose();
@@ -124,7 +123,6 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
       if (mounted &&
           !_playFocus.hasFocus &&
           !_episodesFocus.hasFocus &&
-          !_libraryFocus.hasFocus &&
           !_topBarFocus.hasFocus) {
         _playFocus.requestFocus();
       }
@@ -135,85 +133,107 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
       skipTraversal: true,
       onKeyEvent: _onKeyBack,
       child: Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Blurred backdrop from the cover.
-          ImageFiltered(
-            imageFilter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-            child: Image(image: cover, fit: BoxFit.cover),
-          ),
-          // Darken uniformly enough that text reads over any cover on both
-          // columns — so the episode list blends into the same backdrop instead
-          // of reading as a separate panel.
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  bg,
-                  bg.withValues(alpha: 0.92),
-                  bg.withValues(alpha: 0.82),
-                ],
-                stops: const [0.0, 0.45, 1.0],
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Blurred backdrop from the cover.
+            ImageFiltered(
+              imageFilter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+              child: Image(image: cover, fit: BoxFit.cover),
+            ),
+            // Darken enough that text reads over any cover on both columns, so
+            // the two sides blend into one screen instead of reading as panels.
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    bg,
+                    bg.withValues(alpha: 0.9),
+                    bg.withValues(alpha: 0.82),
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
               ),
             ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                _TopBar(
-                  topBarFocus: _topBarFocus,
-                  refreshing: _refreshing,
-                  onBack: () => Navigator.maybePop(context),
-                  onRefresh: _refresh,
-                  onMore: _showMore,
-                  onDown: () => _playFocus.requestFocus(),
-                ),
-                Expanded(
-                  child: Row(
-                    // Top-align both columns: without this the shorter left
-                    // column centres vertically while the full-height episode
-                    // list pins to the top, so the two sides start ~100px apart.
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        flex: 42,
-                        child: _LeftInfo(
-                          manga: manga,
-                          cover: cover,
-                          episodeCount: episodes.length,
-                          watched: watched,
-                          resume: resume,
-                          playFocus: _playFocus,
-                          libraryFocus: _libraryFocus,
-                          onPlay: () => resume?.pushToReaderView(context),
-                          onExitRight: () => _episodesFocus.requestFocus(),
-                          onExitUp: () => _topBarFocus.requestFocus(),
-                          onToggleLibrary: _toggleLibrary,
-                        ),
-                      ),
-                      Expanded(
-                        flex: 58,
-                        child: _EpisodesPanel(
-                          episodes: episodes,
-                          resumeId: resume?.id,
-                          firstFocus: _episodesFocus,
-                          loading: !hasLive && episodes.isEmpty,
-                          onExitLeft: () => _playFocus.requestFocus(),
-                          onOpen: (c) =>
-                              c.pushToReaderView(context, ignoreIsRead: true),
-                        ),
-                      ),
-                    ],
+            SafeArea(
+              child: Column(
+                children: [
+                  _TopBar(
+                    topBarFocus: _topBarFocus,
+                    refreshing: _refreshing,
+                    onBack: () => Navigator.maybePop(context),
+                    onRefresh: _refresh,
+                    onDown: () => _playFocus.requestFocus(),
                   ),
-                ),
-              ],
+                  Expanded(
+                    // Screen padding on both sides so nothing hugs the TV edge.
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 40),
+                      child: Row(
+                        // Both columns full height and top-aligned.
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Left: hero + vertical action list (equal half).
+                          Expanded(
+                            child: _LeftInfo(
+                              manga: manga,
+                              cover: cover,
+                              episodeCount: episodes.length,
+                              watched: watched,
+                              resume: resume,
+                              playFocus: _playFocus,
+                              onPlay: () => resume?.pushToReaderView(context),
+                              onToggleLibrary: _toggleLibrary,
+                              onCategories: () => showCategorySelectionDialog(
+                                context: context,
+                                ref: ref,
+                                itemType: manga.itemType,
+                                singleManga: manga,
+                              ),
+                              onBrowser: _openInBrowser,
+                              onRecommendations: () => context.push(
+                                '/recommendations',
+                                extra: (
+                                  manga.name,
+                                  manga.itemType,
+                                  ref.read(algorithmWeightsStateProvider),
+                                ),
+                              ),
+                              onWatchOrder: () => context.push(
+                                '/watchOrder',
+                                extra: (manga.name, null),
+                              ),
+                              onMigrate: () =>
+                                  context.push('/migrate', extra: manga),
+                              onExitRight: () => _episodesFocus.requestFocus(),
+                              onExitUp: () => _topBarFocus.requestFocus(),
+                            ),
+                          ),
+                          // Right: episodes (equal half).
+                          Expanded(
+                            child: _EpisodesPanel(
+                              episodes: episodes,
+                              resumeId: resume?.id,
+                              firstFocus: _episodesFocus,
+                              loading: !hasLive && episodes.isEmpty,
+                              onExitLeft: () => _playFocus.requestFocus(),
+                              onOpen: (c) => c.pushToReaderView(
+                                context,
+                                ignoreIsRead: true,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -230,56 +250,6 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
     setState(() {});
   }
 
-  /// Overflow menu — the actions the touch app bar carried that don't warrant a
-  /// permanent slot on TV: categories, open-in-browser, migrate, and (anime)
-  /// recommendations / watch order.
-  void _showMore() {
-    showDialog<void>(
-      context: context,
-      builder: (_) => _MoreMenu(
-        items: [
-          (
-            icon: Icons.label_outline,
-            label: 'Edit categories',
-            onTap: () => showCategorySelectionDialog(
-              context: context,
-              ref: ref,
-              itemType: manga.itemType,
-              singleManga: manga,
-            ),
-          ),
-          (
-            icon: Icons.public,
-            label: 'Open in browser',
-            onTap: _openInBrowser,
-          ),
-          (
-            icon: Icons.recommend_outlined,
-            label: 'Recommendations',
-            onTap: () => context.push(
-              '/recommendations',
-              extra: (
-                manga.name,
-                manga.itemType,
-                ref.read(algorithmWeightsStateProvider),
-              ),
-            ),
-          ),
-          (
-            icon: Icons.format_list_numbered,
-            label: 'Watch order',
-            onTap: () => context.push('/watchOrder', extra: (manga.name, null)),
-          ),
-          (
-            icon: Icons.swap_horiz,
-            label: 'Migrate',
-            onTap: () => context.push('/migrate', extra: manga),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _openInBrowser() {
     final source = getSource(manga.lang!, manga.source!, manga.sourceId);
     if (source == null || manga.link == null) return;
@@ -294,17 +264,15 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
   }
 }
 
-/// Focusable top bar restoring the classic detail's actions (back, refresh, and
-/// an overflow "…" with categories / open-in-browser / migrate / recommendations
-/// / watch order) that a touch-only app bar / pull-to-refresh dropped on TV.
-/// Down hands focus to the content below.
+/// Focusable top bar: Back (top-left) and Refresh. Everything else now lives as
+/// a button in the hero's action list, so the bar stays minimal. Down hands
+/// focus to the content below.
 class _TopBar extends StatelessWidget {
   const _TopBar({
     required this.topBarFocus,
     required this.refreshing,
     required this.onBack,
     required this.onRefresh,
-    required this.onMore,
     required this.onDown,
   });
 
@@ -312,7 +280,6 @@ class _TopBar extends StatelessWidget {
   final bool refreshing;
   final VoidCallback onBack;
   final VoidCallback onRefresh;
-  final VoidCallback onMore;
   final VoidCallback onDown;
 
   @override
@@ -329,7 +296,7 @@ class _TopBar extends StatelessWidget {
         return KeyEventResult.ignored;
       },
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+        padding: const EdgeInsets.fromLTRB(28, 10, 28, 4),
         child: Row(
           children: [
             _TopBarButton(
@@ -342,7 +309,6 @@ class _TopBar extends StatelessWidget {
               icon: refreshing ? Icons.hourglass_empty : Icons.refresh,
               onPressed: onRefresh,
             ),
-            _TopBarButton(icon: Icons.more_horiz, onPressed: onMore),
           ],
         ),
       ),
@@ -402,6 +368,10 @@ class _TopBarButtonState extends State<_TopBarButton> {
   }
 }
 
+/// The hero column: cover with the title bottom-aligned beside it, meta, tags,
+/// synopsis, then a vertical, scrollable list of actions. Up/Down moves through
+/// the actions (auto-scrolling); Right off any action jumps to the episodes;
+/// the first action (Continue) hands Up back to the top bar.
 class _LeftInfo extends StatelessWidget {
   const _LeftInfo({
     required this.manga,
@@ -410,11 +380,15 @@ class _LeftInfo extends StatelessWidget {
     required this.watched,
     required this.resume,
     required this.playFocus,
-    required this.libraryFocus,
     required this.onPlay,
+    required this.onToggleLibrary,
+    required this.onCategories,
+    required this.onBrowser,
+    required this.onRecommendations,
+    required this.onWatchOrder,
+    required this.onMigrate,
     required this.onExitRight,
     required this.onExitUp,
-    required this.onToggleLibrary,
   });
 
   final Manga manga;
@@ -423,11 +397,15 @@ class _LeftInfo extends StatelessWidget {
   final int watched;
   final Chapter? resume;
   final FocusNode playFocus;
-  final FocusNode libraryFocus;
   final VoidCallback onPlay;
+  final VoidCallback onToggleLibrary;
+  final VoidCallback onCategories;
+  final VoidCallback onBrowser;
+  final VoidCallback onRecommendations;
+  final VoidCallback onWatchOrder;
+  final VoidCallback onMigrate;
   final VoidCallback onExitRight;
   final VoidCallback onExitUp;
-  final VoidCallback onToggleLibrary;
 
   @override
   Widget build(BuildContext context) {
@@ -442,147 +420,159 @@ class _LeftInfo extends StatelessWidget {
       if ((manga.author ?? '').isNotEmpty) manga.author!,
     ].where((s) => s.isNotEmpty).join('   ·   ');
     final favorite = manga.favorite ?? false;
-    final resumeLabel = resume == null
+    final resumeWord = resume == null
         ? 'Play'
         : (resume!.isRead ?? false)
-        ? 'Replay ${resume!.name ?? ''}'.trim()
+        ? 'Replay'
         : (watched > 0 ? 'Continue' : 'Play');
+    final resumeName = resume?.name?.trim() ?? '';
+    final resumeLabel = resumeName.isEmpty
+        ? resumeWord
+        : '$resumeWord  ·  $resumeName';
 
-    // Right anywhere in this column hands focus to the episode list.
-    return Focus(
-      canRequestFocus: false,
-      skipTraversal: true,
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent || event is KeyRepeatEvent) {
-          if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-            onExitRight();
-            return KeyEventResult.handled;
-          }
-          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-            onExitUp();
-            return KeyEventResult.handled;
-          }
-        }
-        return KeyEventResult.ignored;
-      },
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(28, 20, 20, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: SizedBox(
-                    width: 150,
-                    child: AspectRatio(
-                      aspectRatio: 0.68,
-                      child: Image(image: cover, fit: BoxFit.cover),
-                    ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(0, 16, 36, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Cover with the title to its right, aligned to the cover's bottom.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 150,
+                  child: AspectRatio(
+                    aspectRatio: 0.68,
+                    child: Image(image: cover, fit: BoxFit.cover),
                   ),
                 ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        manga.name ?? '',
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                          height: 1.1,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      if (metaBits.isNotEmpty)
-                        Text(
-                          metaBits,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Theme.of(context).hintColor,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            // Genre tags — a full-width row under the poster/title block so they
-            // aren't cramped into the narrow column beside the poster.
-            if (genres.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final g in genres.take(8))
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        g,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: accent,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                ],
               ),
-            ],
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                _ActionButton(
-                  focusNode: playFocus,
-                  autofocus: true,
-                  accent: accent,
-                  filled: true,
-                  icon: Icons.play_arrow_rounded,
-                  label: resumeLabel,
-                  onPressed: onPlay,
-                  onRight: () => libraryFocus.requestFocus(),
-                ),
-                const SizedBox(width: 12),
-                _ActionButton(
-                  focusNode: libraryFocus,
-                  accent: accent,
-                  filled: false,
-                  icon: favorite ? Icons.favorite : Icons.favorite_border,
-                  label: favorite ? 'In Library' : 'Add to Library',
-                  onPressed: onToggleLibrary,
-                ),
-              ],
-            ),
-            if ((manga.description ?? '').isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Text(
-                manga.description!,
-                maxLines: 5,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.45,
-                  color: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge!.color!.withValues(alpha: 0.85),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Text(
+                  manga.name ?? '',
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    height: 1.12,
+                  ),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 14),
+          if (metaBits.isNotEmpty)
+            Text(
+              metaBits,
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).hintColor,
+              ),
+            ),
+          if (genres.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final g in genres.take(8))
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      g,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: accent,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ],
-        ),
+          if ((manga.description ?? '').isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(
+              manga.description!,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.45,
+                color: Theme.of(
+                  context,
+                ).textTheme.bodyLarge!.color!.withValues(alpha: 0.82),
+              ),
+            ),
+          ],
+          const SizedBox(height: 18),
+          // Vertical action list (the old overflow "…" items, inline). Right
+          // off any of them jumps to the episodes.
+          _VActionButton(
+            focusNode: playFocus,
+            autofocus: true,
+            accent: accent,
+            primary: true,
+            icon: Icons.play_arrow_rounded,
+            label: resumeLabel,
+            onPressed: onPlay,
+            onExitRight: onExitRight,
+            onExitUp: onExitUp,
+          ),
+          _VActionButton(
+            accent: accent,
+            icon: favorite ? Icons.favorite : Icons.favorite_border,
+            label: favorite ? 'In Library' : 'Add to Library',
+            onPressed: onToggleLibrary,
+            onExitRight: onExitRight,
+          ),
+          _VActionButton(
+            accent: accent,
+            icon: Icons.label_outline,
+            label: 'Categories',
+            onPressed: onCategories,
+            onExitRight: onExitRight,
+          ),
+          _VActionButton(
+            accent: accent,
+            icon: Icons.public,
+            label: 'Open in browser',
+            onPressed: onBrowser,
+            onExitRight: onExitRight,
+          ),
+          _VActionButton(
+            accent: accent,
+            icon: Icons.recommend_outlined,
+            label: 'Recommendations',
+            onPressed: onRecommendations,
+            onExitRight: onExitRight,
+          ),
+          _VActionButton(
+            accent: accent,
+            icon: Icons.format_list_numbered,
+            label: 'Watch order',
+            onPressed: onWatchOrder,
+            onExitRight: onExitRight,
+          ),
+          _VActionButton(
+            accent: accent,
+            icon: Icons.swap_horiz,
+            label: 'Migrate',
+            onPressed: onMigrate,
+            onExitRight: onExitRight,
+          ),
+        ],
       ),
     );
   }
@@ -590,44 +580,52 @@ class _LeftInfo extends StatelessWidget {
   String _cap(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 }
 
-class _ActionButton extends StatefulWidget {
-  const _ActionButton({
+/// A full-width, d-pad-focusable action row. Subtle until focused (the primary
+/// Continue action carries a faint persistent tint so it still reads first);
+/// accent fill on focus. Right hands off to the episode list.
+class _VActionButton extends StatefulWidget {
+  const _VActionButton({
     required this.accent,
-    required this.filled,
     required this.icon,
     required this.label,
     required this.onPressed,
+    required this.onExitRight,
     this.focusNode,
     this.autofocus = false,
-    this.onRight,
+    this.primary = false,
+    this.onExitUp,
   });
 
   final Color accent;
-  final bool filled;
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
+  final VoidCallback onExitRight;
   final FocusNode? focusNode;
   final bool autofocus;
-
-  /// Optional Right-key handoff (e.g. Play → Library) so the neighbouring
-  /// action stays reachable before the column-level Right escapes to episodes.
-  final VoidCallback? onRight;
+  final bool primary;
+  final VoidCallback? onExitUp;
 
   @override
-  State<_ActionButton> createState() => _ActionButtonState();
+  State<_VActionButton> createState() => _VActionButtonState();
 }
 
-class _ActionButtonState extends State<_ActionButton> {
+class _VActionButtonState extends State<_VActionButton> {
   bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
-    final active = _focused || widget.filled;
-    final bg = active
-        ? widget.accent
-        : widget.accent.withValues(alpha: 0.16);
-    final fg = active ? Colors.white : widget.accent;
+    final accent = widget.accent;
+    final bg = _focused
+        ? accent
+        : widget.primary
+        ? accent.withValues(alpha: 0.18)
+        : Colors.white.withValues(alpha: 0.05);
+    final fg = _focused
+        ? Colors.white
+        : widget.primary
+        ? accent
+        : Theme.of(context).textTheme.bodyLarge!.color;
     return Focus(
       focusNode: widget.focusNode,
       autofocus: widget.autofocus,
@@ -637,11 +635,16 @@ class _ActionButtonState extends State<_ActionButton> {
           widget.onPressed();
           return KeyEventResult.handled;
         }
-        if (widget.onRight != null &&
-            (event is KeyDownEvent || event is KeyRepeatEvent) &&
-            event.logicalKey == LogicalKeyboardKey.arrowRight) {
-          widget.onRight!();
-          return KeyEventResult.handled;
+        if (event is KeyDownEvent || event is KeyRepeatEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+            widget.onExitRight();
+            return KeyEventResult.handled;
+          }
+          if (widget.onExitUp != null &&
+              event.logicalKey == LogicalKeyboardKey.arrowUp) {
+            widget.onExitUp!();
+            return KeyEventResult.handled;
+          }
         }
         return KeyEventResult.ignored;
       },
@@ -649,24 +652,30 @@ class _ActionButtonState extends State<_ActionButton> {
         onTap: widget.onPressed,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          transform: Matrix4.identity()..scale(_focused ? 1.05 : 1.0),
-          transformAlignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           decoration: BoxDecoration(
             color: bg,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.icon, color: fg, size: 22),
-              const SizedBox(width: 8),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: fg,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+              Icon(
+                widget.icon,
+                color: _focused ? Colors.white : accent,
+                size: 22,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  widget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: fg,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
                 ),
               ),
             ],
@@ -875,7 +884,10 @@ class _EpisodeRowState extends State<_EpisodeRow> {
               if (filler)
                 Container(
                   margin: const EdgeInsets.only(left: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 1,
+                  ),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(color: Theme.of(context).hintColor),
@@ -907,100 +919,6 @@ class _EpisodeRowState extends State<_EpisodeRow> {
                     color: Theme.of(context).hintColor,
                   ),
                 ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The top bar's "…" overflow, rendered as a compact d-pad-navigable dialog.
-/// First row autofocuses; Up/Down move between rows; select fires the action
-/// (after closing the menu).
-class _MoreMenu extends StatelessWidget {
-  const _MoreMenu({required this.items});
-
-  final List<({IconData icon, String label, VoidCallback onTap})> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      contentPadding: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      content: SizedBox(
-        width: 300,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = 0; i < items.length; i++)
-              _MoreMenuRow(item: items[i], autofocus: i == 0),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MoreMenuRow extends StatefulWidget {
-  const _MoreMenuRow({required this.item, required this.autofocus});
-
-  final ({IconData icon, String label, VoidCallback onTap}) item;
-  final bool autofocus;
-
-  @override
-  State<_MoreMenuRow> createState() => _MoreMenuRowState();
-}
-
-class _MoreMenuRowState extends State<_MoreMenuRow> {
-  bool _focused = false;
-
-  void _activate() {
-    Navigator.of(context).pop();
-    widget.item.onTap();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = context.primaryColor;
-    return Focus(
-      autofocus: widget.autofocus,
-      onFocusChange: (f) => setState(() => _focused = f),
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent && _isSelect(event.logicalKey)) {
-          _activate();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: GestureDetector(
-        onTap: _activate,
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: _focused
-                ? accent.withValues(alpha: 0.18)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                widget.item.icon,
-                size: 20,
-                color: _focused
-                    ? accent
-                    : Theme.of(context).textTheme.bodyLarge!.color,
-              ),
-              const SizedBox(width: 14),
-              Text(
-                widget.item.label,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
             ],
           ),
         ),
