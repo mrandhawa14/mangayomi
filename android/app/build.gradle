@@ -57,8 +57,9 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         // Launcher label via placeholder so a side-by-side beta can rename it
-        // without affecting normal builds (see the tvBeta block below).
-        manifestPlaceholders = [appLabel: "Mangayomi"]
+        // without affecting normal builds (see the tvBeta block below). Use +=,
+        // not =, so Flutter's injected applicationName placeholder survives.
+        manifestPlaceholders += [appLabel: "Mangayomi"]
     }
 
     packagingOptions {
@@ -85,7 +86,7 @@ android {
            // are untouched.
            if (project.hasProperty("tvBeta")) {
                applicationIdSuffix ".tvbeta"
-               manifestPlaceholders = [appLabel: "Mangayomi TV Beta"]
+               manifestPlaceholders += [appLabel: "Mangayomi TV Beta"]
            }
        }
    }
