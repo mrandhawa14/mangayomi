@@ -46,6 +46,12 @@ jobs:
 
   windows:
     runs-on: windows-latest
+    env:
+      # The runner's newest MSVC (VS 18) turns the <experimental/coroutine>
+      # deprecation into a hard error (STL1011); local_auth_windows and
+      # permission_handler_windows (C++/WinRT) still include it. Silence it via
+      # the CL env var, which cl.exe prepends to every compile.
+      CL: /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS=1
     steps:
       - uses: actions/checkout@v4
       # cargokit's symlink resolver (flutter_discord_rpc_fork) uses Get-Item,
