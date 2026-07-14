@@ -830,14 +830,14 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
             : "libmpv",
       ),
     );
-    // Picture-in-Picture is implemented natively by the media_kit fork
-    // (VideoOutputPIP) and only exposed on iOS 15+. Enabling auto-PiP makes the
-    // player float into a PiP window when the app is backgrounded instead of
-    // pausing. The call awaits the controller's platform init internally, so
-    // it is safe to fire here without awaiting.
-    if (Platform.isIOS) {
-      _controller.enableAutoPictureInPicture();
-    }
+    // Picture-in-Picture (media_kit fork VideoOutputPIP, iOS 15+) is DISABLED:
+    // on iOS 26 the second UIScene that PiP creates re-runs plugin registration
+    // and connectivity_plus segfaults (EXC_BAD_ACCESS in didFinishLaunching).
+    // PiP is only the trigger; the real fix is the UIScene lifecycle migration
+    // (flutter.dev/to/uiscene-migration). Re-enable after that. See closed #757.
+    // if (Platform.isIOS) {
+    //   _controller.enableAutoPictureInPicture();
+    // }
     // If player is being launched the first time,
     // use global "Use Fullscreen" setting.
     // Else (if user already watches an episode and just changes it),
@@ -2115,15 +2115,18 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
                   )
                   .toList(),
         ),
-        if (Platform.isIOS && _controller.isPictureInPictureAvailable())
-          IconButton(
-            tooltip: 'Picture in Picture',
-            icon: const Icon(
-              Icons.picture_in_picture_alt,
-              color: Colors.white,
-            ),
-            onPressed: () => _controller.enterPictureInPicture(),
-          ),
+        // PiP button disabled: entering PiP crashes on iOS 26 (see the
+        // enableAutoPictureInPicture note above / closed #757). Re-enable with
+        // the UIScene migration.
+        // if (Platform.isIOS && _controller.isPictureInPictureAvailable())
+        //   IconButton(
+        //     tooltip: 'Picture in Picture',
+        //     icon: const Icon(
+        //       Icons.picture_in_picture_alt,
+        //       color: Colors.white,
+        //     ),
+        //     onPressed: () => _controller.enterPictureInPicture(),
+        //   ),
         IconButton(
           icon: const Icon(Icons.fit_screen_outlined, color: Colors.white),
           onPressed: () async {
