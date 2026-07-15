@@ -10,6 +10,7 @@ import 'package:mangayomi/modules/browse/sources/widgets/source_list_tile.dart';
 import 'package:mangayomi/modules/more/settings/browse/providers/browse_state_provider.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/language.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 class SourcesScreen extends ConsumerStatefulWidget {
   final Function(int) tabIndex;
@@ -29,8 +30,38 @@ class SourcesScreen extends ConsumerStatefulWidget {
 class _SourcesScreenState extends ConsumerState<SourcesScreen> {
   final controller = ScrollController();
 
+  // Stable focus nodes per source id (source / Latest / Pin buttons) so d-pad
+  // focus follows a source when pinning moves it to another group.
+  final Map<int, FocusNode> _srcNodes = {};
+  final Map<int, FocusNode> _latestNodes = {};
+  final Map<int, FocusNode> _pinNodes = {};
+
+  FocusNode _node(Map<int, FocusNode> m, int? id) =>
+      m.putIfAbsent(id ?? -1, () => FocusNode());
+
+  /// One source entry: the TV 3-button row on Android TV, else the classic tile.
+  Widget _row(Source source) {
+    if (isTv) {
+      return TvSourceRow(
+        source: source,
+        itemType: widget.itemType,
+        sourceNode: _node(_srcNodes, source.id),
+        latestNode: _node(_latestNodes, source.id),
+        pinNode: _node(_pinNodes, source.id),
+      );
+    }
+    return SourceListTile(source: source, itemType: widget.itemType);
+  }
+
   @override
   void dispose() {
+    for (final n in [
+      ..._srcNodes.values,
+      ..._latestNodes.values,
+      ..._pinNodes.values,
+    ]) {
+      n.dispose();
+    }
     controller.dispose();
     super.dispose();
   }
@@ -39,7 +70,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
   Widget build(BuildContext context) {
     final l10n = l10nLocalizations(context)!;
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: EdgeInsets.only(top: 10, left: isTv ? 8 : 0, right: isTv ? 8 : 0),
       child: StreamBuilder(
         stream: isar.sources
             .filter()
@@ -98,13 +129,8 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                     ],
                   ),
                 ),
-                SourceListTile(
-                  source: Source(
-                    name: "local",
-                    lang: "",
-                    itemType: widget.itemType,
-                  ),
-                  itemType: widget.itemType,
+                _row(
+                  Source(name: "local", lang: "", itemType: widget.itemType),
                 ),
               ],
             );
@@ -144,10 +170,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                     ),
                   ),
                   itemBuilder: (context, Source element) {
-                    return SourceListTile(
-                      source: element,
-                      itemType: widget.itemType,
-                    );
+                    return _row(element);
                   },
                   groupComparator: (group1, group2) => group1.compareTo(group2),
                   itemComparator: (item1, item2) =>
@@ -172,10 +195,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                     ),
                   ),
                   itemBuilder: (context, Source element) {
-                    return SourceListTile(
-                      source: element,
-                      itemType: widget.itemType,
-                    );
+                    return _row(element);
                   },
                   groupComparator: (group1, group2) => group1.compareTo(group2),
                   itemComparator: (item1, item2) =>
@@ -201,10 +221,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                     ),
                   ),
                   itemBuilder: (context, Source element) {
-                    return SourceListTile(
-                      source: element,
-                      itemType: widget.itemType,
-                    );
+                    return _row(element);
                   },
                   groupComparator: (group1, group2) => group1.compareTo(group2),
                   itemComparator: (item1, item2) =>
@@ -228,13 +245,12 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                           ],
                         ),
                       ),
-                      SourceListTile(
-                        source: Source(
+                      _row(
+                        Source(
                           name: "local",
                           lang: "",
                           itemType: widget.itemType,
                         ),
-                        itemType: widget.itemType,
                       ),
                     ],
                   ),

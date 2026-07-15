@@ -25,6 +25,7 @@ import 'package:mangayomi/modules/more/providers/downloaded_only_state_provider.
 import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
 import 'package:mangayomi/modules/widgets/category_selection_dialog.dart';
 import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
+import 'package:mangayomi/modules/widgets/tv_pill.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
@@ -1305,7 +1306,7 @@ class _CategoryPillsState extends State<_CategoryPills> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _Pill(
+                  TvPill(
                     label: 'All',
                     focusNode: _allNode,
                     selected: widget.selected == null,
@@ -1319,7 +1320,7 @@ class _CategoryPillsState extends State<_CategoryPills> {
                   for (final c in widget.categories)
                     Padding(
                       padding: const EdgeInsets.only(left: 8),
-                      child: _Pill(
+                      child: TvPill(
                         label: c.name ?? '',
                         selected: widget.selected == c.id,
                         onTap: () => widget.onSelect(c.id),
@@ -1328,7 +1329,7 @@ class _CategoryPillsState extends State<_CategoryPills> {
                     ),
                   Padding(
                     padding: const EdgeInsets.only(left: 8),
-                    child: _Pill(
+                    child: TvPill(
                       label: 'Category',
                       icon: Icons.add,
                       onTap: () =>
@@ -1345,135 +1346,8 @@ class _CategoryPillsState extends State<_CategoryPills> {
   }
 }
 
-/// A focusable filter pill: idle · focused (accent fill) · selected
-/// (accent-tinted) — three clearly distinct states for a d-pad across a room.
-class _Pill extends StatefulWidget {
-  const _Pill({
-    required this.label,
-    required this.onTap,
-    this.onLongPress,
-    this.onMenu,
-    this.icon,
-    this.focusNode,
-    this.selected = false,
-    this.autofocus = false,
-  });
-  final String label;
-  final IconData? icon;
-  final FocusNode? focusNode;
-  final bool selected;
-  final bool autofocus;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  /// Handled only while this pill has focus, so the remote's Menu button stays
-  /// free everywhere else — it reads as "options for the focused item", which
-  /// a cover will want.
-  final VoidCallback? onMenu;
-
-  @override
-  State<_Pill> createState() => _PillState();
-}
-
-class _PillState extends State<_Pill> {
-  bool _focused = false;
-  bool _held = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = context.primaryColor;
-    final bg = _focused
-        ? accent
-        : widget.selected
-        ? accent.withValues(alpha: 0.22)
-        : Theme.of(context).hintColor.withValues(alpha: 0.14);
-    final fg = _focused
-        ? Colors.white
-        : widget.selected
-        ? accent
-        : Theme.of(context).colorScheme.onSurface;
-    return Focus(
-      focusNode: widget.focusNode,
-      autofocus: widget.autofocus,
-      onFocusChange: (f) {
-        setState(() => _focused = f);
-        if (f && context.mounted && Scrollable.maybeOf(context) != null) {
-          Scrollable.ensureVisible(
-            context,
-            alignment: 0.5,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-          );
-        }
-      },
-      onKeyEvent: (node, event) {
-        final onMenu = widget.onMenu;
-        if (onMenu != null &&
-            event is KeyDownEvent &&
-            event.logicalKey == LogicalKeyboardKey.contextMenu) {
-          onMenu();
-          return KeyEventResult.handled;
-        }
-        if (!_isSelectKey(event.logicalKey)) return KeyEventResult.ignored;
-        // A remote reports a held OK as key *repeats*, never as a pointer
-        // long-press. Both tap and hold resolve on release, so whatever a hold
-        // opens never inherits the rest of that press — a dialog raised on the
-        // first repeat would be driven by the repeats still to come.
-        if (event is KeyDownEvent) {
-          _held = false;
-          return KeyEventResult.handled;
-        }
-        if (event is KeyRepeatEvent) {
-          _held = true;
-          return KeyEventResult.handled;
-        }
-        if (event is KeyUpEvent) {
-          final longPress = widget.onLongPress;
-          if (_held && longPress != null) {
-            longPress();
-          } else {
-            widget.onTap();
-          }
-          _held = false;
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        onLongPress: widget.onLongPress,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 130),
-          curve: Curves.easeOut,
-          transform: Matrix4.identity()..scale(_focused ? 1.08 : 1.0),
-          transformAlignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: bg,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (widget.icon != null) ...[
-                Icon(widget.icon, size: 14, color: fg),
-                const SizedBox(width: 4),
-              ],
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: fg,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+// The filter pill moved to the shared `TvPill` widget
+// (lib/modules/widgets/tv_pill.dart), reused by the Browse tab switcher.
 
 /// Reuses the categories screen's add-category flow to create an anime category
 /// inline from the home.
