@@ -193,7 +193,7 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
                   Expanded(
                     // Screen padding on both sides so nothing hugs the TV edge.
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(48, 0, 48, 28),
+                      padding: const EdgeInsets.fromLTRB(48, 0, 48, 48),
                       child: Row(
                         // Both columns full height and top-aligned.
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -451,7 +451,7 @@ class _LeftInfo extends StatelessWidget {
         : '$resumeWord  ·  $resumeName';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 20, 36, 16),
+      padding: const EdgeInsets.fromLTRB(32, 20, 32, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -748,73 +748,49 @@ class _EpisodesPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = context.primaryColor;
-    // No panel surface and no divider/edge line — the list sits over the same
-    // backdrop as the left side (Netflix-style) so the two columns read as one
-    // screen. Cap the list to a comfortable reading width so watched checkmarks
-    // sit next to their titles instead of being flung to the screen edge on
-    // wide (desktop / large-TV) layouts — but never wider than the column, so
-    // it fills the narrower Fire TV column without overflowing.
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final listWidth = constraints.maxWidth < 560.0
-            ? constraints.maxWidth
-            : 560.0;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              width: listWidth,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                    child: Text(
-                      'Episodes  ·  ${episodes.length}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+    // No panel surface and no divider line: the list sits over the same
+    // backdrop as the left side so the two columns read as one screen. It fills
+    // its half so the episodes balance the hero on the left instead of leaving
+    // an empty gap on the right.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          child: Text(
+            'Episodes  ·  ${episodes.length}',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+        ),
+        Expanded(
+          child: loading
+              ? const SizedBox.shrink()
+              : episodes.isEmpty
+              ? Center(
+                  child: Text(
+                    'No episodes yet',
+                    style: TextStyle(color: Theme.of(context).hintColor),
                   ),
-                  Expanded(
-                    child: loading
-                        ? const SizedBox.shrink()
-                        : episodes.isEmpty
-                        ? Center(
-                            child: Text(
-                              'No episodes yet',
-                              style: TextStyle(
-                                color: Theme.of(context).hintColor,
-                              ),
-                            ),
-                          )
-                        : FocusTraversalGroup(
-                            child: ListView.builder(
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              itemCount: episodes.length,
-                              itemBuilder: (context, i) {
-                                final ep = episodes[i];
-                                return _EpisodeRow(
-                                  accent: accent,
-                                  episode: ep,
-                                  index: i,
-                                  isResume:
-                                      ep.id != null && ep.id == resumeId,
-                                  onOpen: () => onOpen(ep),
-                                  onExitLeft: onExitLeft,
-                                );
-                              },
-                            ),
-                          ),
+                )
+              : FocusTraversalGroup(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(top: 6, bottom: 28),
+                    itemCount: episodes.length,
+                    itemBuilder: (context, i) {
+                      final ep = episodes[i];
+                      return _EpisodeRow(
+                        accent: accent,
+                        episode: ep,
+                        index: i,
+                        isResume: ep.id != null && ep.id == resumeId,
+                        onOpen: () => onOpen(ep),
+                        onExitLeft: onExitLeft,
+                      );
+                    },
                   ),
-                ],
-              ),
-            ),
-            const Spacer(),
-          ],
-        );
-      },
+                ),
+        ),
+      ],
     );
   }
 }
