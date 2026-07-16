@@ -13,6 +13,7 @@ import 'package:mangayomi/services/fetch_sources_list.dart';
 import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/language.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 final extensionListTileWidget = Provider.family<Widget, Source>((ref, source) {
   return ExtensionListTileWidget(source: source);
@@ -60,6 +61,21 @@ class _ExtensionListTileWidgetState
     }
   }
 
+  // A clearly visible accent tint when a row's action button holds d-pad focus
+  // on Android TV. Off-TV keeps the default (subtle) button styling.
+  ButtonStyle? _tvFocusStyle(BuildContext context) => isTv
+      ? ButtonStyle(
+          shape: WidgetStateProperty.all(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          overlayColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.focused)
+                ? context.primaryColor.withValues(alpha: 0.3)
+                : null,
+          ),
+        )
+      : null;
+
   Widget _buildTrailingButton(BuildContext context, String label) {
     final isInstall = label == context.l10n.install;
     final isUpdate = label == context.l10n.update;
@@ -73,6 +89,7 @@ class _ExtensionListTileWidgetState
             mainAxisSize: MainAxisSize.min,
             children: [
               TextButton(
+                style: _tvFocusStyle(context),
                 onPressed: _isLoading
                     ? null
                     : () {
@@ -96,6 +113,7 @@ class _ExtensionListTileWidgetState
               ),
               if (_sourceNotEmpty)
                 TextButton(
+                  style: _tvFocusStyle(context),
                   onPressed: () {
                     showDialog(
                       context: context,
@@ -193,6 +211,9 @@ class _ExtensionListTileWidgetState
         : l10n.settings;
 
     return ListTile(
+      focusColor: isTv
+          ? context.primaryColor.withValues(alpha: 0.2)
+          : null,
       onTap: _isLoading
           ? null
           : () {

@@ -117,6 +117,9 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
               children: [
                 if (isExtensionTab)
                   IconButton(
+                    focusColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.4),
                     onPressed: () {
                       context.push('/createExtension');
                     },
@@ -127,6 +130,9 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
                   ),
                 IconButton(
                   splashRadius: 20,
+                  focusColor: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.4),
                   onPressed: () {
                     if (isExtensionTab) {
                       setState(() {
@@ -147,6 +153,9 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
             ),
       IconButton(
         splashRadius: 20,
+        focusColor: Theme.of(
+          context,
+        ).colorScheme.primary.withValues(alpha: 0.4),
         onPressed: () {
           context.push(
             isExtensionTab ? '/ExtensionLang' : '/sourceFilter',
