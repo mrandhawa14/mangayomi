@@ -67,6 +67,10 @@ class Settings {
 
   List<MCookie>? cookiesList;
 
+  List<SavedSearch>? savedSearchesList;
+
+  List<UpdateError>? updateErrorsList;
+
   @enumerated
   late ReaderMode defaultReaderMode;
 
@@ -89,6 +93,8 @@ class Settings {
   int? concurrentDownloads;
 
   String? downloadLocation;
+
+  List<int>? downloadQueueOrder;
 
   List<FilterScanlator>? filterScanlatorList;
 
@@ -180,6 +186,10 @@ class Settings {
   bool? doHEnabled;
 
   int? doHProviderId;
+
+  String? customDohUrl;
+
+  String? cfProxyUrl;
 
   String? btServerAddress;
 
@@ -354,6 +364,8 @@ class Settings {
 
   bool? showNSFW;
 
+  bool? showSourceBadge;
+
   double? ttsSpeechRate;
 
   double? ttsPitch;
@@ -361,6 +373,13 @@ class Settings {
   String? ttsLanguage;
 
   String? ttsVoice;
+
+  bool? autoPlayNextEpisode;
+  bool? tvAnimeOnlyOverride;
+  bool? tvPlayerStyle;
+  bool? tvHomeStyle;
+  bool? tvHomeGenreRows;
+  bool? tvForceDev;
 
   Settings({
     this.id = 227,
@@ -390,6 +409,8 @@ class Settings {
     this.chapterPageIndexList,
     this.userAgent = defaultUserAgent,
     this.cookiesList,
+    this.savedSearchesList,
+    this.updateErrorsList,
     this.defaultReaderMode = ReaderMode.vertical,
     this.personalReaderModeList,
     this.animatePageTransitions = true,
@@ -425,6 +446,7 @@ class Settings {
     this.personalPageModeList,
     this.backupFrequency,
     this.backupListOptions,
+    this.downloadQueueOrder,
     this.autoBackupLocation,
     this.startDatebackup,
     this.usePageTapZones = true,
@@ -442,6 +464,8 @@ class Settings {
     this.customDns = "",
     this.doHEnabled = false,
     this.doHProviderId = 0,
+    this.customDohUrl = "",
+    this.cfProxyUrl = "",
     this.btServerAddress = "127.0.0.1",
     this.btServerPort,
     this.fullScreenReader = true,
@@ -524,10 +548,17 @@ class Settings {
     this.readerNavigationLayout = 0,
     this.backupCompressionLevel,
     this.showNSFW = false,
+    this.showSourceBadge = false,
     this.ttsSpeechRate = 0.5,
     this.ttsPitch = 1.0,
     this.ttsLanguage,
     this.ttsVoice,
+    this.autoPlayNextEpisode,
+    this.tvAnimeOnlyOverride,
+    this.tvPlayerStyle,
+    this.tvHomeStyle,
+    this.tvHomeGenreRows,
+    this.tvForceDev,
   });
 
   Settings.fromJson(Map<String, dynamic> json) {
@@ -578,6 +609,16 @@ class Settings {
     if (json['cookiesList'] != null) {
       cookiesList = (json['cookiesList'] as List)
           .map((e) => MCookie.fromJson(e))
+          .toList();
+    }
+    if (json['savedSearchesList'] != null) {
+      savedSearchesList = (json['savedSearchesList'] as List)
+          .map((e) => SavedSearch.fromJson(e))
+          .toList();
+    }
+    if (json['updateErrorsList'] != null) {
+      updateErrorsList = (json['updateErrorsList'] as List)
+          .map((e) => UpdateError.fromJson(e))
           .toList();
     }
     cropBorders = json['cropBorders'];
@@ -659,6 +700,7 @@ class Settings {
     userAgent = json['userAgent'];
     backupFrequency = json['backupFrequency'];
     backupListOptions = json['backupListOptions']?.cast<int>();
+    downloadQueueOrder = json['downloadQueueOrder']?.cast<int>();
     autoBackupLocation = json['autoBackupLocation'];
     startDatebackup = json['startDatebackup'];
     usePageTapZones = json['usePageTapZones'];
@@ -677,6 +719,8 @@ class Settings {
     customDns = json['customDns'];
     doHEnabled = json['doHEnabled'];
     doHProviderId = json['doHProviderId'];
+    customDohUrl = json['customDohUrl'];
+    cfProxyUrl = json['cfProxyUrl'];
     btServerAddress = json['btServerAddress'];
     btServerPort = json['btServerPort'];
     customColorFilter = json['customColorFilter'] != null
@@ -808,10 +852,17 @@ class Settings {
     readerNavigationLayout = json['readerNavigationLayout'];
     backupCompressionLevel = json['backupCompressionLevel'];
     showNSFW = json['showNSFW'];
+    showSourceBadge = json['showSourceBadge'];
     ttsSpeechRate = json['ttsSpeechRate']?.toDouble();
     ttsPitch = json['ttsPitch']?.toDouble();
     ttsLanguage = json['ttsLanguage'];
     ttsVoice = json['ttsVoice'];
+    autoPlayNextEpisode = json['autoPlayNextEpisode'];
+    tvAnimeOnlyOverride = json['tvAnimeOnlyOverride'];
+    tvPlayerStyle = json['tvPlayerStyle'];
+    tvHomeStyle = json['tvHomeStyle'];
+    tvHomeGenreRows = json['tvHomeGenreRows'];
+    tvForceDev = json['tvForceDev'];
   }
 
   Map<String, dynamic> toJson() => {
@@ -844,6 +895,8 @@ class Settings {
     'checkForAppUpdates': checkForAppUpdates,
     'checkForExtensionUpdates': checkForExtensionUpdates,
     'cookiesList': cookiesList,
+    'savedSearchesList': savedSearchesList,
+    'updateErrorsList': updateErrorsList,
     'cropBorders': cropBorders,
     'dateFormat': dateFormat,
     'defaultReaderMode': defaultReaderMode.index,
@@ -896,6 +949,7 @@ class Settings {
     'userAgent': userAgent,
     'backupFrequency': backupFrequency,
     'backupListOptions': backupListOptions,
+    'downloadQueueOrder': downloadQueueOrder,
     'autoBackupLocation': autoBackupLocation,
     'startDatebackup': startDatebackup,
     'usePageTapZones': usePageTapZones,
@@ -912,6 +966,8 @@ class Settings {
     'customDns': customDns,
     'doHEnabled': doHEnabled,
     'doHProviderId': doHProviderId,
+    'customDohUrl': customDohUrl,
+    'cfProxyUrl': cfProxyUrl,
     'btServerAddress': btServerAddress,
     'btServerPort': btServerPort,
     'fullScreenReader': fullScreenReader,
@@ -998,10 +1054,17 @@ class Settings {
     'readerNavigationLayout': readerNavigationLayout,
     'backupCompressionLevel': backupCompressionLevel,
     'showNSFW': showNSFW,
+    'showSourceBadge': showSourceBadge,
     'ttsSpeechRate': ttsSpeechRate,
     'ttsPitch': ttsPitch,
     'ttsLanguage': ttsLanguage,
     'ttsVoice': ttsVoice,
+    'autoPlayNextEpisode': autoPlayNextEpisode,
+    'tvAnimeOnlyOverride': tvAnimeOnlyOverride,
+    'tvPlayerStyle': tvPlayerStyle,
+    'tvHomeStyle': tvHomeStyle,
+    'tvHomeGenreRows': tvHomeGenreRows,
+    'tvForceDev': tvForceDev,
   };
 }
 
@@ -1033,6 +1096,40 @@ enum ScaleType {
 }
 
 enum BackgroundColor { black, grey, white, automatic }
+
+@embedded
+class SavedSearch {
+  int? sourceId;
+  String name;
+  String query;
+  SavedSearch({this.sourceId, this.name = '', this.query = ''});
+  SavedSearch.fromJson(Map<String, dynamic> json)
+    : sourceId = json['sourceId'],
+      name = json['name'] ?? '',
+      query = json['query'] ?? '';
+  Map<String, dynamic> toJson() => {
+    'sourceId': sourceId,
+    'name': name,
+    'query': query,
+  };
+}
+
+@embedded
+class UpdateError {
+  int mangaId;
+  String name;
+  String error;
+  UpdateError({this.mangaId = 0, this.name = '', this.error = ''});
+  UpdateError.fromJson(Map<String, dynamic> json)
+    : mangaId = json['mangaId'] ?? 0,
+      name = json['name'] ?? '',
+      error = json['error'] ?? '';
+  Map<String, dynamic> toJson() => {
+    'mangaId': mangaId,
+    'name': name,
+    'error': error,
+  };
+}
 
 @embedded
 class MCookie {

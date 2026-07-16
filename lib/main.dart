@@ -22,8 +22,6 @@ import 'package:mangayomi/models/source.dart';
 import 'package:mangayomi/models/track.dart' as track;
 import 'package:mangayomi/models/track_preference.dart';
 import 'package:mangayomi/models/track_search.dart';
-import 'package:mangayomi/modules/anime/providers/auto_play_next_provider.dart';
-import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/manga/detail/providers/track_state_providers.dart';
 import 'package:mangayomi/modules/manga/reader/providers/crop_borders_provider.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/storage_usage.dart';
@@ -35,11 +33,8 @@ import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_mode_state_provider.dart';
 import 'package:mangayomi/l10n/generated/app_localizations.dart';
 import 'package:mangayomi/services/http/m_client.dart';
-import 'package:mangayomi/services/http/doh/doh_custom_store.dart';
-import 'package:mangayomi/services/http/cf_proxy_store.dart';
 import 'package:mangayomi/services/isolate_service.dart';
 import 'package:mangayomi/services/m_extension_server.dart';
-import 'package:mangayomi/services/update_errors_provider.dart';
 import 'package:mangayomi/services/download_manager/m_downloader.dart';
 import 'package:mangayomi/src/rust/frb_generated.dart';
 import 'package:mangayomi/utils/discord_rpc.dart';
@@ -48,8 +43,6 @@ import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/utils/url_protocol/api.dart';
 import 'package:mangayomi/modules/more/settings/appearance/providers/theme_provider.dart';
 import 'package:mangayomi/modules/library/providers/file_scanner.dart';
-import 'package:mangayomi/modules/library/providers/library_source_badge_provider.dart';
-import 'package:mangayomi/modules/manga/home/providers/saved_searches_provider.dart';
 import 'package:mangayomi/modules/more/settings/security/providers/security_state_provider.dart';
 import 'package:mangayomi/modules/more/settings/security/app_lock_screen.dart';
 import 'package:media_kit/media_kit.dart';
@@ -238,10 +231,6 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
   final hivePath = isApple ? "databases" : p.join("Mangayomi", "databases");
   await Hive.initFlutter(Platform.isAndroid ? "" : hivePath);
   Hive.registerAdapter(TrackSearchAdapter());
-  await openPlayerPrefsBox();
-  await DohCustomStore.openBox();
-  await CfProxyStore.openBox();
-  await openTvPrefsBox();
   // Dev-only: let any device force TV mode so the Android TV UI can be tested
   // with a keyboard / arrow keys without a real TV. Read once the prefs box is
   // open; gated to debug builds so it never ships in release.
@@ -254,9 +243,6 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
       Hive.box('tv_prefs').get('dev_force_tv') == true) {
     isTv = true;
   }
-  await openUpdateErrorsBox();
-  await openLibraryPrefsBox();
-  await openSavedSearchesBox();
   if (isDesktop && !kDebugMode) {
     discordRpc = DiscordRPC(applicationId: "1395040506677039157");
     await discordRpc?.initialize();
