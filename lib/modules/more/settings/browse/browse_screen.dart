@@ -38,6 +38,7 @@ class BrowseSScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(l10n!.browse)),
       body: SingleChildScrollView(
+        padding: tvPageInsets,
         child: Column(
           children: [
             // The master "anime only" TV switch: turning it off removes all the
@@ -96,14 +97,14 @@ class BrowseSScreen extends ConsumerWidget {
                         );
                       },
                       title: Text(l10n.manga_extensions_repo),
-                    subtitle: Text(
-                      l10n.manage_manga_repo_urls,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: context.secondaryColor,
+                      subtitle: Text(
+                        l10n.manage_manga_repo_urls,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.secondaryColor,
+                        ),
                       ),
                     ),
-                  ),
                   ListTile(
                     onTap: () {
                       context.push(
@@ -129,14 +130,14 @@ class BrowseSScreen extends ConsumerWidget {
                         );
                       },
                       title: Text(l10n.novel_extensions_repo),
-                    subtitle: Text(
-                      l10n.manage_novel_repo_urls,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: context.secondaryColor,
+                      subtitle: Text(
+                        l10n.manage_novel_repo_urls,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.secondaryColor,
+                        ),
                       ),
                     ),
-                  ),
                   SwitchListTile(
                     value: checkForExtensionUpdates,
                     title: Text(l10n.check_for_extension_updates),

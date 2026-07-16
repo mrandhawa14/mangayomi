@@ -34,6 +34,7 @@ class ReaderScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n.reader)),
       body: SingleChildScrollView(
+        padding: tvPageInsets,
         child: Column(
           children: [
             ListTile(

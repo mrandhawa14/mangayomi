@@ -58,6 +58,7 @@ class _GeneralStateScreen extends ConsumerState<GeneralScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n!.general)),
       body: SingleChildScrollView(
+        padding: tvPageInsets,
         child: Column(
           children: [
             if (kDebugMode || const bool.fromEnvironment('ALLOW_FORCE_TV'))
@@ -527,7 +528,8 @@ class _GeneralStateScreen extends ConsumerState<GeneralScreen> {
         builder: (dialogContext, setLocalState) {
           final trimmed = url.trim();
           final isValid =
-              trimmed.isEmpty || trimmed.startsWith('http://') ||
+              trimmed.isEmpty ||
+              trimmed.startsWith('http://') ||
               trimmed.startsWith('https://');
           return AlertDialog(
             title: const Text(
