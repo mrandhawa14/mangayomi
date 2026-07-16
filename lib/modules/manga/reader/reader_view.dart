@@ -42,6 +42,7 @@ import 'package:mangayomi/modules/more/settings/reader/reader_screen.dart';
 import 'package:mangayomi/modules/manga/reader/providers/manga_reader_provider.dart';
 import 'package:mangayomi/modules/manga/reader/image_view_webtoon.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
+import 'package:mangayomi/modules/widgets/retry_button.dart';
 import 'package:mangayomi/utils/system_ui.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -760,28 +761,11 @@ class _MangaChapterPageGalleryState
                 ),
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: GestureDetector(
-                    onLongPress: () {
+                  child: RetryButton(
+                    onRetry: () {
                       state.reLoadImage();
                       _failedToLoadImage.value = false;
                     },
-                    onTap: () {
-                      state.reLoadImage();
-                      _failedToLoadImage.value = false;
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: context.primaryColor,
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 8,
-                          horizontal: 16,
-                        ),
-                        child: Text(l10n.retry),
-                      ),
-                    ),
                   ),
                 ),
               ],
@@ -1173,18 +1157,25 @@ class _MangaChapterPageGalleryState
     if (needsReload) {
       final isLocalArchive = (currentChapter.archivePath ?? '').isNotEmpty;
       final storageProvider = StorageProvider();
-      final mangaDirectory = await storageProvider.getMangaMainDirectory(currentChapter);
+      final mangaDirectory = await storageProvider.getMangaMainDirectory(
+        currentChapter,
+      );
       final archivePath = isLocalArchive
           ? currentChapter.archivePath
-          : (mangaDirectory != null ? p.join(mangaDirectory.path, "${currentChapter.name}.cbz") : null);
+          : (mangaDirectory != null
+                ? p.join(mangaDirectory.path, "${currentChapter.name}.cbz")
+                : null);
 
       if (archivePath != null && await File(archivePath).exists()) {
         try {
-          final local = await ref.read(getArchiveDataFromFileProvider(archivePath).future);
+          final local = await ref.read(
+            getArchiveDataFromFileProvider(archivePath).future,
+          );
           final images = local.images ?? [];
           int imgIdx = 0;
           for (final page in pages) {
-            if (page.chapter?.id == currentChapter.id && !page.isTransitionPage) {
+            if (page.chapter?.id == currentChapter.id &&
+                !page.isTransitionPage) {
               if (imgIdx < images.length) {
                 page.archiveImage = images[imgIdx].image;
               }
@@ -1233,11 +1224,7 @@ class _MangaChapterPageGalleryState
       }
     }
 
-    await Future.wait([
-      worker(),
-      worker(),
-      worker(),
-    ]);
+    await Future.wait([worker(), worker(), worker()]);
   }
 
   Future<void> _onPageChanged(int index) async {

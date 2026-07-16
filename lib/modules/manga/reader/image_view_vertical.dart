@@ -9,6 +9,7 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/extensions/others.dart';
 import 'package:mangayomi/modules/manga/reader/widgets/circular_progress_indicator_animate_rotate.dart';
+import 'package:mangayomi/modules/widgets/retry_button.dart';
 
 class ImageViewVertical extends ConsumerWidget {
   final UChapDataPreload data;
@@ -87,28 +88,11 @@ class ImageViewVertical extends ConsumerWidget {
                   ),
                   Padding(
                     padding: const EdgeInsets.all(8.0),
-                    child: GestureDetector(
-                      onLongPress: () {
+                    child: RetryButton(
+                      onRetry: () {
                         state.reLoadImage();
                         failedToLoadImage(false);
                       },
-                      onTap: () {
-                        state.reLoadImage();
-                        failedToLoadImage(false);
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: context.primaryColor,
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 8,
-                            horizontal: 16,
-                          ),
-                          child: Text(context.l10n.retry),
-                        ),
-                      ),
                     ),
                   ),
                 ],

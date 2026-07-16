@@ -31,6 +31,7 @@ import 'package:mangayomi/utils/global_style.dart';
 import 'package:mangayomi/utils/item_type_localization.dart';
 import 'package:marquee/marquee.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 class MangaHomeScreen extends ConsumerStatefulWidget {
   final Source source;
@@ -761,6 +762,10 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                         Column(
                           children: [
                             IconButton(
+                              autofocus: isTv,
+                              focusColor: isTv
+                                  ? context.primaryColor.withValues(alpha: 0.4)
+                                  : null,
                               onPressed: () {
                                 if (_selectedIndex == 2 &&
                                         (_isSearch && _query.isNotEmpty) ||
@@ -799,6 +804,9 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                         Column(
                           children: [
                             IconButton(
+                              focusColor: isTv
+                                  ? context.primaryColor.withValues(alpha: 0.4)
+                                  : null,
                               onPressed: () async {
                                 final baseUrl = ref.watch(
                                   sourceBaseUrlProvider(source: source),

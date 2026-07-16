@@ -12,6 +12,7 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
+import 'package:mangayomi/modules/widgets/retry_button.dart';
 
 /// Unified double page view for both paged and continuous reading modes.
 ///
@@ -306,23 +307,11 @@ class _DoublePageViewState extends State<DoublePageView>
   }
 
   Widget _buildRetryButton(ExtendedImageState state, dynamic l10n) {
-    return GestureDetector(
-      onLongPress: () {
+    return RetryButton(
+      onRetry: () {
         state.reLoadImage();
         widget.onFailedToLoadImage?.call(false);
       },
-      onTap: () {
-        state.reLoadImage();
-        widget.onFailedToLoadImage?.call(false);
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.primaryColor,
-          borderRadius: BorderRadius.circular(30),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        child: Text(l10n.retry),
-      ),
     );
   }
 }
