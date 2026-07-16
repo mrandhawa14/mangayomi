@@ -12,10 +12,17 @@ class TvRowButton extends StatefulWidget {
     required this.onTap,
     required this.child,
     this.focusNode,
+    this.dimmed = false,
   });
   final VoidCallback onTap;
   final Widget child;
   final FocusNode? focusNode;
+
+  /// Show a faint tint while this button is not focused. Rows set this on their
+  /// leading button whenever focus is anywhere in the row, so the row a remote
+  /// is on stays readable while focus sits on a trailing button. This button's
+  /// own focus always wins over it.
+  final bool dimmed;
 
   @override
   State<TvRowButton> createState() => _TvRowButtonState();
@@ -54,7 +61,11 @@ class _TvRowButtonState extends State<TvRowButton> {
           curve: Curves.easeOut,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            color: _focused ? accent.withValues(alpha: 0.20) : Colors.transparent,
+            color: _focused
+                ? accent.withValues(alpha: 0.20)
+                : widget.dimmed
+                ? accent.withValues(alpha: 0.07)
+                : Colors.transparent,
           ),
           child: widget.child,
         ),
