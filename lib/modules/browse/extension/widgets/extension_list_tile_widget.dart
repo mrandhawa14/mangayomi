@@ -33,10 +33,6 @@ class _ExtensionListTileWidgetState
     extends ConsumerState<ExtensionListTileWidget> {
   bool _isLoading = false;
 
-  /// True while focus is anywhere in this row, including the action buttons.
-  /// Keeps the extension button faintly lit so the row stays easy to follow
-  /// once focus moves off it.
-  bool _rowFocused = false;
   late final bool _updateAvailable;
   late final bool _sourceNotEmpty;
 
@@ -275,83 +271,67 @@ class _ExtensionListTileWidgetState
   /// (extension / settings or update / uninstall), two while it is not
   /// (extension / install), mirroring the source rows.
   Widget _buildTvRow(BuildContext context, String label) {
-    // Observes the row's buttons without taking focus itself, so the leading
-    // button can stay lit while focus sits on an action button.
-    return Focus(
-      canRequestFocus: false,
-      skipTraversal: true,
-      onFocusChange: (f) {
-        if (f != _rowFocused) setState(() => _rowFocused = f);
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(
-          children: [
-            Expanded(
-              child: TvRowButton(
-                dimmed: _rowFocused,
-                onTap: () => _onMainTap(context),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      _icon(),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              widget.source.name!,
-                              style: const TextStyle(fontSize: 16),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            _meta(context),
-                          ],
+    return TvListRow(
+      children: [
+        Expanded(
+          child: TvRowButton(
+            onTap: () => _onMainTap(context),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Row(
+                children: [
+                  _icon(),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          widget.source.name!,
+                          style: const TextStyle(fontSize: 16),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                        _meta(context),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
-            const SizedBox(width: 6),
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.all(12),
-                child: SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2.0),
-                ),
-              )
-            else ...[
-              TvRowButton(
-                onTap: () => _onActionTap(context),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Icon(_actionIcon(context, label), size: 24),
-                ),
-              ),
-              if (_sourceNotEmpty) ...[
-                const SizedBox(width: 6),
-                TvRowButton(
-                  onTap: () => _openUninstallDialog(context),
-                  child: const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Icon(Icons.delete_outline, size: 24),
-                  ),
-                ),
-              ],
-            ],
-          ],
+          ),
         ),
-      ),
+        const SizedBox(width: 6),
+        if (_isLoading)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: SizedBox(
+              height: 24,
+              width: 24,
+              child: CircularProgressIndicator(strokeWidth: 2.0),
+            ),
+          )
+        else ...[
+          TvRowButton(
+            onTap: () => _onActionTap(context),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Icon(_actionIcon(context, label), size: 24),
+            ),
+          ),
+          if (_sourceNotEmpty) ...[
+            const SizedBox(width: 6),
+            TvRowButton(
+              onTap: () => _openUninstallDialog(context),
+              child: const Padding(
+                padding: EdgeInsets.all(12),
+                child: Icon(Icons.delete_outline, size: 24),
+              ),
+            ),
+          ],
+        ],
+      ],
     );
   }
 

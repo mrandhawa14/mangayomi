@@ -11,6 +11,7 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/providers/storage_provider.dart';
 import 'package:mangayomi/modules/browse/extension/extension_screen.dart';
 import 'package:mangayomi/modules/browse/sources/sources_screen.dart';
+import 'package:mangayomi/modules/widgets/tv_row_button.dart';
 import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/library/widgets/search_text_form_field.dart';
 import 'package:mangayomi/modules/widgets/tv_pill.dart';
@@ -38,6 +39,11 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
     with TickerProviderStateMixin {
   late final hideItems = ref.read(hideItemsStateProvider);
   final _textEditingController = TextEditingController();
+
+  /// Which TV list row currently holds focus, so the rest of the list can
+  /// fade back while one is active. Lives here so both the sources and the
+  /// extensions tab share it.
+  final _tvActiveRow = ValueNotifier<Object?>(null);
   late TabController _tabBarController;
   late List<BrowseTab> _tabList;
 
@@ -81,6 +87,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
 
   @override
   void dispose() {
+    _tvActiveRow.dispose();
     _tabBarController.dispose();
     _textEditingController.dispose();
     super.dispose();
@@ -242,9 +249,12 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
                 ),
               ),
               Expanded(
-                child: TabBarView(
-                  controller: _tabBarController,
-                  children: _tabViews(),
+                child: TvRowFocusScope(
+                  notifier: _tvActiveRow,
+                  child: TabBarView(
+                    controller: _tabBarController,
+                    children: _tabViews(),
+                  ),
                 ),
               ),
             ],
@@ -316,10 +326,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
             }).toList(),
           ),
         ),
-        body: TabBarView(
-          controller: _tabBarController,
-          children: _tabViews(),
-        ),
+        body: TabBarView(controller: _tabBarController, children: _tabViews()),
       ),
     );
   }
