@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
@@ -41,13 +40,6 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   final _textEditingController = TextEditingController();
   late TabController _tabBarController;
   late List<BrowseTab> _tabList;
-
-  // TV top-bar focus ladder: [icons, pills, list]. Up/Down hops between these
-  // scopes at the edges so the top bar never steals focus. See #729.
-  final FocusScopeNode _iconsScope = FocusScopeNode(debugLabel: 'browseIcons');
-  final FocusScopeNode _pillsScope = FocusScopeNode(debugLabel: 'browsePills');
-  final FocusScopeNode _bodyScope = FocusScopeNode(debugLabel: 'browseBody');
-  List<FocusScopeNode> get _order => [_iconsScope, _pillsScope, _bodyScope];
 
   // Hide manga & novel from Browse (sources + extensions) on the anime-only TV
   // layout so only anime shows. Recomputed live so toggling "Anime only" updates
@@ -91,47 +83,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   void dispose() {
     _tabBarController.dispose();
     _textEditingController.dispose();
-    _iconsScope.dispose();
-    _pillsScope.dispose();
-    _bodyScope.dispose();
     super.dispose();
-  }
-
-  // Move focus between the ordered top-bar sections on Up/Down. Within the list
-  // (bodyScope) let its own rows move first; only hop to the adjacent section at
-  // the top/bottom edge. Left/Right are ignored here (row buttons + nav rail).
-  KeyEventResult _handleVertical(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-      return KeyEventResult.ignored;
-    }
-    final k = event.logicalKey;
-    if (k != LogicalKeyboardKey.arrowDown && k != LogicalKeyboardKey.arrowUp) {
-      return KeyEventResult.ignored;
-    }
-    final cur = _order.indexWhere((s) => s.hasFocus);
-    if (cur == -1) return KeyEventResult.ignored;
-    final down = k == LogicalKeyboardKey.arrowDown;
-    if (identical(_order[cur], _bodyScope)) {
-      final moved =
-          FocusManager.instance.primaryFocus?.focusInDirection(
-            down ? TraversalDirection.down : TraversalDirection.up,
-          ) ??
-          false;
-      if (moved) return KeyEventResult.handled;
-    }
-    final target = down ? cur + 1 : cur - 1;
-    if (target < 0 || target >= _order.length) return KeyEventResult.ignored;
-    final curDesc = _order[cur].traversalDescendants.toList();
-    final col = curDesc.indexWhere((n) => n.hasPrimaryFocus);
-    _focusSection(_order[target], col < 0 ? 0 : col);
-    return KeyEventResult.handled;
-  }
-
-  bool _focusSection(FocusScopeNode scope, int column) {
-    final descendants = scope.traversalDescendants.toList();
-    if (descendants.isEmpty) return false;
-    descendants[column.clamp(0, descendants.length - 1)].requestFocus();
-    return true;
   }
 
   bool _isSearch = false;
@@ -236,74 +188,57 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
       length: _tabList.length,
       child: Scaffold(
         body: SafeArea(
-          child: Focus(
-            onKeyEvent: _handleVertical,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                FocusScope(
-                  node: _iconsScope,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
-                    child: Row(
-                      children: [
-                        Text(
-                          l10n.browse,
-                          style: TextStyle(
-                            color: Theme.of(context).hintColor,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const Spacer(),
-                        ..._actions(context, isExtensionTab, currentTab.type),
-                      ],
-                    ),
-                  ),
-                ),
-                FocusScope(
-                  node: _pillsScope,
-                  child: SizedBox(
-                    height: 46,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+                child: Row(
+                  children: [
+                    Text(
+                      l10n.browse,
+                      style: TextStyle(
+                        color: Theme.of(context).hintColor,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
                       ),
-                      children: [
-                        for (int i = 0; i < _tabList.length; i++)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Center(
-                              child: TvPill(
-                                label:
-                                    _tabList[i].kind == BrowseTabKind.extensions
-                                    ? _tabList[i].type.localizedExtensions(l10n)
-                                    : _tabList[i].type.localizedSources(l10n),
-                                selected: i == _tabBarController.index,
-                                onTap: () {
-                                  _tabBarController.animateTo(i);
-                                  setState(() {});
-                                },
-                              ),
-                            ),
-                          ),
+                    ),
+                    const Spacer(),
+                    ..._actions(context, isExtensionTab, currentTab.type),
+                  ],
+                ),
+              ),
+              // Pills centred on screen, matching the home category filter.
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (int i = 0; i < _tabList.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
+                        TvPill(
+                          label: _tabList[i].kind == BrowseTabKind.extensions
+                              ? _tabList[i].type.localizedExtensions(l10n)
+                              : _tabList[i].type.localizedSources(l10n),
+                          selected: i == _tabBarController.index,
+                          onTap: () {
+                            _tabBarController.animateTo(i);
+                            setState(() {});
+                          },
+                        ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
-                Expanded(
-                  child: FocusScope(
-                    node: _bodyScope,
-                    child: TabBarView(
-                      controller: _tabBarController,
-                      children: _tabViews(),
-                    ),
-                  ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabBarController,
+                  children: _tabViews(),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

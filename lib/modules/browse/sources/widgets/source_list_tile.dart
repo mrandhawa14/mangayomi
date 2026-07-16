@@ -388,10 +388,6 @@ class _TvRowButtonState extends State<_TvRowButton> {
             color: _focused
                 ? accent.withValues(alpha: 0.20)
                 : Colors.transparent,
-            border: Border.all(
-              color: _focused ? accent : Colors.transparent,
-              width: 1.5,
-            ),
           ),
           child: widget.child,
         ),
