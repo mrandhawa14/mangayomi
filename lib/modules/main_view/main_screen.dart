@@ -740,31 +740,8 @@ class _TabletLayoutState extends State<_TabletLayout> {
     Widget navRail = NavigationRail(
       labelType: NavigationRailLabelType.all,
       useIndicator: true,
-      // The Android TV experience is still beta — flag it in the rail.
-      leading: isTv
-          ? Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  'BETA',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-            )
-          : null,
+      // Brand the rail on TV: the app glyph, then the beta flag under it.
+      leading: isTv ? const _TvRailHeader() : null,
       destinations: destinations,
       selectedIndex:
           (widget.currentIndex >= 0 &&
@@ -1021,6 +998,52 @@ class _UpdatesBadgeWidget extends ConsumerWidget {
 
         return Badge(label: Text("${entries.length}"), child: icon);
       },
+    );
+  }
+}
+
+/// The top of the TV nav rail: the app glyph over a beta flag.
+///
+/// Uses the bare glyph asset rather than the app icon, tinted with the theme
+/// accent, so it carries no white tile of its own into a dark rail and follows
+/// whatever accent the user picked.
+class _TvRailHeader extends StatelessWidget {
+  const _TvRailHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    return Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 10),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(
+            'assets/app_icons/icon.png',
+            width: 30,
+            height: 30,
+            color: accent,
+            filterQuality: FilterQuality.medium,
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Text(
+              'BETA',
+              style: TextStyle(
+                color: accent,
+                fontSize: 8,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
