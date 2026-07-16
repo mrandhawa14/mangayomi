@@ -94,7 +94,7 @@ class _TvListRowState extends State<TvListRow> {
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOut,
-        opacity: fadedBack ? 0.45 : 1.0,
+        opacity: fadedBack ? 0.7 : 1.0,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOut,

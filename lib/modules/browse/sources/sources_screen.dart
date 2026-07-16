@@ -40,14 +40,25 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
       m.putIfAbsent(id ?? -1, () => FocusNode());
 
   /// One source entry: the TV 3-button row on Android TV, else the classic tile.
-  Widget _row(Source source) {
+  ///
+  /// [shareNodes] keys the row's focus nodes by source id, so d-pad focus
+  /// follows a source when pinning moves it between the pinned and language
+  /// groups. Those two are mutually exclusive (isPinned vs !isPinned), so a
+  /// source is only ever in one of them and the node is never contested.
+  ///
+  /// Last used is different: it is a *second* row for a source that also
+  /// appears in one of those groups. A FocusNode can only be attached to one
+  /// widget at a time, so sharing there means the later-built row wins and the
+  /// Last used row, which is built first, silently becomes unfocusable. It gets
+  /// its own nodes instead.
+  Widget _row(Source source, {bool shareNodes = true}) {
     if (isTv) {
       return TvSourceRow(
         source: source,
         itemType: widget.itemType,
-        sourceNode: _node(_srcNodes, source.id),
-        latestNode: _node(_latestNodes, source.id),
-        pinNode: _node(_pinNodes, source.id),
+        sourceNode: shareNodes ? _node(_srcNodes, source.id) : null,
+        latestNode: shareNodes ? _node(_latestNodes, source.id) : null,
+        pinNode: shareNodes ? _node(_pinNodes, source.id) : null,
       );
     }
     return SourceListTile(source: source, itemType: widget.itemType);
@@ -170,7 +181,10 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                     ),
                   ),
                   itemBuilder: (context, Source element) {
-                    return _row(element);
+                    // Own nodes: this source also has a row in its pinned or
+                    // language group, and a shared node would leave this one
+                    // unfocusable.
+                    return _row(element, shareNodes: false);
                   },
                   groupComparator: (group1, group2) => group1.compareTo(group2),
                   itemComparator: (item1, item2) =>
