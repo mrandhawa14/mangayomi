@@ -65,6 +65,7 @@ class _UpdatesScreenState extends BaseLibraryTabScreenState<UpdatesScreen> {
       if (ref.watch(updateErrorsProvider).isNotEmpty)
         IconButton(
           splashRadius: 20,
+          focusColor: tvIconFocusColor(context),
           tooltip: 'Update errors',
           icon: Icon(
             Icons.error_outline,
@@ -77,11 +78,13 @@ class _UpdatesScreenState extends BaseLibraryTabScreenState<UpdatesScreen> {
         ),
       IconButton(
         splashRadius: 20,
+        focusColor: tvIconFocusColor(context),
         icon: Icon(Icons.refresh_outlined, color: Theme.of(context).hintColor),
         onPressed: _updateLibrary,
       ),
       IconButton(
         splashRadius: 20,
+        focusColor: tvIconFocusColor(context),
         icon: Icon(
           Icons.delete_sweep_outlined,
           color: Theme.of(context).hintColor,

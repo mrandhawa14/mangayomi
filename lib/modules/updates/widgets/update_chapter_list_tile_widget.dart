@@ -9,6 +9,7 @@ import 'package:mangayomi/utils/constant.dart';
 import 'package:mangayomi/modules/manga/download/download_page_widget.dart';
 import 'package:mangayomi/utils/extensions/chapter_extensions.dart';
 import 'package:mangayomi/utils/headers.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 class UpdateChapterListTileWidget extends ConsumerWidget {
   final Chapter chapter;
@@ -27,6 +28,9 @@ class UpdateChapterListTileWidget extends ConsumerWidget {
       color: Colors.transparent,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
+        focusColor: isTv
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)
+            : null,
         onTap: () async {
           chapter.pushToReaderView(context, ignoreIsRead: true);
         },
