@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:isar_community/isar.dart';
 import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/source.dart';
-import 'package:mangayomi/modules/widgets/tv_pill.dart';
+import 'package:mangayomi/modules/widgets/tv_row_button.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
@@ -205,7 +204,7 @@ class TvSourceRow extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: _TvRowButton(
+              child: TvRowButton(
                 focusNode: sourceNode,
                 onTap: () => _openPopular(context),
                 child: Padding(
@@ -299,7 +298,7 @@ class TvSourceRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            _TvRowButton(
+            TvRowButton(
               focusNode: latestNode,
               onTap: () => context.push('/mangaHome', extra: (source, true)),
               child: Padding(
@@ -312,7 +311,7 @@ class TvSourceRow extends StatelessWidget {
             ),
             if (!isLocal) ...[
               const SizedBox(width: 6),
-              _TvRowButton(
+              TvRowButton(
                 focusNode: pinNode,
                 onTap: () {
                   isar.writeTxnSync(
@@ -333,63 +332,6 @@ class TvSourceRow extends StatelessWidget {
               ),
             ],
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// A focusable button used inside [TvSourceRow]: transparent when idle,
-/// accent-tinted with an accent border when focused, and firing [onTap] on a
-/// remote OK press.
-class _TvRowButton extends StatefulWidget {
-  const _TvRowButton({required this.onTap, required this.child, this.focusNode});
-  final VoidCallback onTap;
-  final Widget child;
-  final FocusNode? focusNode;
-
-  @override
-  State<_TvRowButton> createState() => _TvRowButtonState();
-}
-
-class _TvRowButtonState extends State<_TvRowButton> {
-  bool _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = context.primaryColor;
-    return Focus(
-      focusNode: widget.focusNode,
-      onFocusChange: (f) {
-        setState(() => _focused = f);
-        if (f && context.mounted && Scrollable.maybeOf(context) != null) {
-          Scrollable.ensureVisible(
-            context,
-            alignment: 0.5,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-          );
-        }
-      },
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent && tvIsSelectKey(event.logicalKey)) {
-          widget.onTap();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 130),
-          curve: Curves.easeOut,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            color: _focused
-                ? accent.withValues(alpha: 0.20)
-                : Colors.transparent,
-          ),
-          child: widget.child,
         ),
       ),
     );
