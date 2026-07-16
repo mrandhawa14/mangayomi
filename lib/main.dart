@@ -138,6 +138,19 @@ void main(List<String> args) async {
         // requested lazily by `createDirectorySafely` / `initDB` the first time a
         // public path actually needs to be written (e.g. a download). See #740.
         isar = await storage.initDB(null, inspector: kDebugMode);
+        // Dev-only: let any device force TV mode so the Android TV UI can be
+        // tested with a keyboard / arrow keys without a real TV. The "Force TV
+        // mode" toggle (Settings > General) normally only works in debug;
+        // desktop tester builds pass --dart-define=ALLOW_FORCE_TV=true so it
+        // works in a release build too, letting testers flip the toggle and
+        // restart to try the Android-TV UI on a Mac/PC with arrow keys. It is a
+        // compile-time flag, so normal release builds are unaffected. Read here,
+        // straight after the database opens and before runApp, so the first
+        // frame already has the right layout.
+        if ((kDebugMode || const bool.fromEnvironment('ALLOW_FORCE_TV')) &&
+            (isar.settings.getSync(227)?.tvForceDev ?? false)) {
+          isTv = true;
+        }
       } catch (e, st) {
         AppLogger.log('Startup init failed: $e\n$st', logLevel: LogLevel.error);
         startupError = e;
@@ -231,18 +244,6 @@ Future<void> _postLaunchInit(StorageProvider storage) async {
   final hivePath = isApple ? "databases" : p.join("Mangayomi", "databases");
   await Hive.initFlutter(Platform.isAndroid ? "" : hivePath);
   Hive.registerAdapter(TrackSearchAdapter());
-  // Dev-only: let any device force TV mode so the Android TV UI can be tested
-  // with a keyboard / arrow keys without a real TV. Read once the prefs box is
-  // open; gated to debug builds so it never ships in release.
-  // The "Force TV mode" toggle normally only works in debug. Desktop tester
-  // builds pass --dart-define=ALLOW_FORCE_TV=true so it also works in a release
-  // build — testers flip the toggle (Settings › General) and restart to try the
-  // Android-TV UI on a Mac/PC with arrow keys. Compile-time flag, so normal
-  // release builds are unaffected.
-  if ((kDebugMode || const bool.fromEnvironment('ALLOW_FORCE_TV')) &&
-      Hive.box('tv_prefs').get('dev_force_tv') == true) {
-    isTv = true;
-  }
   if (isDesktop && !kDebugMode) {
     discordRpc = DiscordRPC(applicationId: "1395040506677039157");
     await discordRpc?.initialize();
