@@ -32,6 +32,7 @@ import 'package:mangayomi/utils/item_type_localization.dart';
 import 'package:marquee/marquee.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:mangayomi/modules/widgets/tv_menu.dart';
 
 class MangaHomeScreen extends ConsumerStatefulWidget {
   final Source source;
@@ -285,6 +286,32 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
       ? true
       : ref.watch(supportsLatestProvider(source: source));
   late final filterList = isLocal ? [] : getFilterList(source: source);
+
+  /// The source overflow actions, shared by the popup menu off-TV and the
+  /// centred TV menu.
+  Future<void> _onOverflowSelected(int value) async {
+    if (value == 0) {
+      final baseUrl = ref.read(sourceBaseUrlProvider(source: source));
+      Map<String, dynamic> data = {
+        'url': baseUrl,
+        'sourceId': source.id.toString(),
+        'title': '',
+      };
+      if (mounted) context.push("/mangawebview", extra: data);
+    } else if (value == 1) {
+      final res = await context.push('/extension_detail', extra: source);
+      if (res != null && mounted) {
+        setState(() {
+          source = res as Source;
+        });
+      }
+    } else if (value == 2) {
+      _promptSaveSearch();
+    } else if (value == 3) {
+      _showSavedSearches();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_selectedIndex == 2 && (_isSearch && _query.isNotEmpty) ||
@@ -390,97 +417,129 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                   },
                   icon: Icon(Icons.search, color: Theme.of(context).hintColor),
                 ),
-          PopupMenuButton(
-            popUpAnimationStyle: popupAnimationStyle,
-            icon: Icon(displayTypeIcon),
-            itemBuilder: (context) {
-              final displayType = ref.watch(mangaHomeDisplayTypeStateProvider);
-              final displayTypeNotifier = ref.read(
-                mangaHomeDisplayTypeStateProvider.notifier,
-              );
-              return [
-                PopupMenuItem<int>(
-                  value: 0,
-                  child: RadioGroup(
-                    groupValue: displayType,
-                    onChanged: (a) {
-                      context.pop();
-                      displayTypeNotifier.setMangaHomeDisplayType(a!);
-                    },
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        RadioListTile(
-                          title: Text(context.l10n.comfortable_grid),
-                          value: DisplayType.comfortableGrid,
-                        ),
-                        RadioListTile(
-                          title: Text(context.l10n.compact_grid),
-                          value: DisplayType.compactGrid,
-                        ),
-                        RadioListTile(
-                          title: Text(context.l10n.list),
-                          value: DisplayType.list,
-                        ),
-                      ],
+          // On TV an anchored dropdown in the corner is a poor remote target,
+          // so pop the same choices in the middle of the screen instead.
+          if (isTv)
+            IconButton(
+              icon: Icon(displayTypeIcon),
+              onPressed: () async {
+                const order = [
+                  DisplayType.comfortableGrid,
+                  DisplayType.compactGrid,
+                  DisplayType.list,
+                ];
+                final current = ref.read(mangaHomeDisplayTypeStateProvider);
+                final picked = await showTvMenu(
+                  context,
+                  title: context.l10n.display_mode,
+                  options: [
+                    TvMenuOption(
+                      context.l10n.comfortable_grid,
+                      selected: current == DisplayType.comfortableGrid,
                     ),
-                  ),
-                ),
-              ];
-            },
-            onSelected: (value) {},
-          ),
-          if (!isLocal)
+                    TvMenuOption(
+                      context.l10n.compact_grid,
+                      selected: current == DisplayType.compactGrid,
+                    ),
+                    TvMenuOption(
+                      context.l10n.list,
+                      selected: current == DisplayType.list,
+                    ),
+                  ],
+                );
+                if (picked != null) {
+                  ref
+                      .read(mangaHomeDisplayTypeStateProvider.notifier)
+                      .setMangaHomeDisplayType(order[picked]);
+                }
+              },
+            )
+          else
             PopupMenuButton(
               popUpAnimationStyle: popupAnimationStyle,
+              icon: Icon(displayTypeIcon),
               itemBuilder: (context) {
+                final displayType = ref.watch(
+                  mangaHomeDisplayTypeStateProvider,
+                );
+                final displayTypeNotifier = ref.read(
+                  mangaHomeDisplayTypeStateProvider.notifier,
+                );
                 return [
                   PopupMenuItem<int>(
                     value: 0,
-                    child: Text(context.l10n.open_in_browser),
-                  ),
-                  PopupMenuItem<int>(
-                    value: 1,
-                    child: Text(context.l10n.settings),
-                  ),
-                  const PopupMenuItem<int>(
-                    value: 2,
-                    child: Text('Save search'),
-                  ),
-                  const PopupMenuItem<int>(
-                    value: 3,
-                    child: Text('Saved searches'),
+                    child: RadioGroup(
+                      groupValue: displayType,
+                      onChanged: (a) {
+                        context.pop();
+                        displayTypeNotifier.setMangaHomeDisplayType(a!);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RadioListTile(
+                            title: Text(context.l10n.comfortable_grid),
+                            value: DisplayType.comfortableGrid,
+                          ),
+                          RadioListTile(
+                            title: Text(context.l10n.compact_grid),
+                            value: DisplayType.compactGrid,
+                          ),
+                          RadioListTile(
+                            title: Text(context.l10n.list),
+                            value: DisplayType.list,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ];
               },
-              onSelected: (value) async {
-                if (value == 0) {
-                  final baseUrl = ref.watch(
-                    sourceBaseUrlProvider(source: source),
-                  );
-                  Map<String, dynamic> data = {
-                    'url': baseUrl,
-                    'sourceId': source.id.toString(),
-                    'title': '',
-                  };
-                  context.push("/mangawebview", extra: data);
-                } else if (value == 1) {
-                  final res = await context.push(
-                    '/extension_detail',
-                    extra: source,
-                  );
-                  if (res != null && mounted) {
-                    setState(() {
-                      source = res as Source;
-                    });
-                  }
-                } else if (value == 2) {
-                  _promptSaveSearch();
-                } else if (value == 3) {
-                  _showSavedSearches();
-                }
-              },
+              onSelected: (value) {},
             ),
+          if (!isLocal)
+            if (isTv)
+              IconButton(
+                icon: const Icon(Icons.more_vert),
+                onPressed: () async {
+                  final picked = await showTvMenu(
+                    context,
+                    title: source.name ?? '',
+                    options: [
+                      TvMenuOption(context.l10n.open_in_browser),
+                      TvMenuOption(context.l10n.settings),
+                      const TvMenuOption('Save search'),
+                      const TvMenuOption('Saved searches'),
+                    ],
+                  );
+                  if (picked != null) await _onOverflowSelected(picked);
+                },
+              )
+            else
+              PopupMenuButton(
+                popUpAnimationStyle: popupAnimationStyle,
+                itemBuilder: (context) {
+                  return [
+                    PopupMenuItem<int>(
+                      value: 0,
+                      child: Text(context.l10n.open_in_browser),
+                    ),
+                    PopupMenuItem<int>(
+                      value: 1,
+                      child: Text(context.l10n.settings),
+                    ),
+                    const PopupMenuItem<int>(
+                      value: 2,
+                      child: Text('Save search'),
+                    ),
+                    const PopupMenuItem<int>(
+                      value: 3,
+                      child: Text('Saved searches'),
+                    ),
+                  ];
+                },
+                onSelected: _onOverflowSelected,
+              ),
         ],
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(AppBar().preferredSize.height * 0.8),
