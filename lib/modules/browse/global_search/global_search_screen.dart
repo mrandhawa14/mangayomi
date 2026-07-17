@@ -106,7 +106,7 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
               itemBuilder: (context, index) {
                 final source = sourceList[index];
                 return SizedBox(
-                  height: isTv ? 290 : 260,
+                  height: 260,
                   child: SourceSearchScreen(
                     key: ValueKey(query),
                     query: query,
@@ -182,7 +182,7 @@ class _SourceSearchScreenState extends ConsumerState<SourceSearchScreen> {
 
     return Scaffold(
       body: SizedBox(
-        height: isTv ? 290 : 260,
+        height: 260,
         child: Column(
           children: [
             ListTile(
@@ -302,44 +302,44 @@ class _MangaGlobalImageCardState extends ConsumerState<MangaGlobalImageCard>
         }
         return KeyEventResult.ignored;
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 130),
-        curve: Curves.easeOut,
-        // Matches the library cover: accent ring plus a slight lift.
-        transform: Matrix4.identity()
-          ..scaleByDouble(
-            _focused ? 1.06 : 1.0,
-            _focused ? 1.06 : 1.0,
-            _focused ? 1.06 : 1.0,
-            1,
+      // The padding sits outside the scale deliberately: it is the room the
+      // focused cover grows into. Inside, it would scale along with the card
+      // and buy nothing, which is why the block had to be stretched before.
+      child: Padding(
+        padding: isTv
+            ? const EdgeInsets.symmetric(horizontal: 8, vertical: 8)
+            : const EdgeInsets.only(left: 10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 130),
+          curve: Curves.easeOut,
+          // Matches the library cover: accent ring plus a slight lift.
+          transform: Matrix4.identity()
+            ..scaleByDouble(
+              _focused ? 1.06 : 1.0,
+              _focused ? 1.06 : 1.0,
+              _focused ? 1.06 : 1.0,
+              1,
+            ),
+          transformAlignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _focused ? context.primaryColor : Colors.transparent,
+              width: 2,
+            ),
           ),
-        transformAlignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: _focused ? context.primaryColor : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: GestureDetector(
-          onTap: _open,
-          child: StreamBuilder(
-            stream: isar.mangas
-                .filter()
-                .langEqualTo(widget.source.lang)
-                .nameEqualTo(getMangaDetail.name)
-                .sourceEqualTo(widget.source.name)
-                .watch(fireImmediately: true),
-            builder: (context, snapshot) {
-              final hasData = snapshot.hasData && snapshot.data!.isNotEmpty;
-              return Padding(
-                // Room on every side, not just the left: the focused cover
-                // scales up and needs somewhere to grow into, or it collides
-                // with its neighbours and clips at the ends of the strip.
-                padding: isTv
-                    ? const EdgeInsets.symmetric(horizontal: 8, vertical: 8)
-                    : const EdgeInsets.only(left: 10),
-                child: Stack(
+          child: GestureDetector(
+            onTap: _open,
+            child: StreamBuilder(
+              stream: isar.mangas
+                  .filter()
+                  .langEqualTo(widget.source.lang)
+                  .nameEqualTo(getMangaDetail.name)
+                  .sourceEqualTo(widget.source.name)
+                  .watch(fireImmediately: true),
+              builder: (context, snapshot) {
+                final hasData = snapshot.hasData && snapshot.data!.isNotEmpty;
+                return Stack(
                   children: [
                     SizedBox(
                       width: 110,
@@ -414,9 +414,9 @@ class _MangaGlobalImageCardState extends ConsumerState<MangaGlobalImageCard>
                         ),
                       ),
                   ],
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),
