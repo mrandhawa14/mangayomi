@@ -23,6 +23,7 @@ import 'package:mangayomi/utils/headers.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 import 'package:mangayomi/modules/widgets/error_text.dart';
 import 'package:mangayomi/modules/widgets/progress_center.dart';
+import 'package:mangayomi/modules/widgets/tv_row_button.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -155,6 +156,88 @@ class _HistoryTabState extends ConsumerState<HistoryTab>
                 itemBuilder: (context, History element) {
                   final chapter = element.chapter.value!;
                   final manga = chapter.manga.value!;
+                  // Two focusable targets on TV, matching the Browse source
+                  // rows: the entry itself, and remove. The cover's own
+                  // tap-to-detail folds into the entry rather than becoming a
+                  // third stop for the remote to pass through.
+                  if (isTv) {
+                    return TvListRow(
+                      children: [
+                        Expanded(
+                          child: TvRowButton(
+                            onTap: () => chapter.pushToReaderView(context),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              child: SizedBox(
+                                height: 92,
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 60,
+                                      height: 90,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(7),
+                                        child: _getCoverImage(manga),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            manga.name!,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: Theme.of(
+                                                context,
+                                              ).textTheme.bodyLarge!.color,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            "${chapter.name!} - ${dateFormatHour(element.date!, context)}",
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Theme.of(
+                                                context,
+                                              ).textTheme.bodyLarge!.color,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        TvRowButton(
+                          onTap: () =>
+                              _openDeleteDialog(l10n, manga, element.id),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Icon(
+                              Icons.delete_outline,
+                              size: 25,
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodyLarge!.color,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
                   return ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.all(0),
@@ -179,12 +262,15 @@ class _HistoryTabState extends ConsumerState<HistoryTab>
                               width: 60,
                               height: 90,
                               child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.all(0),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(7),
-                                  ),
-                                ).copyWith(overlayColor: _tvFocusOverlay(context)),
+                                style:
+                                    ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.all(0),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(7),
+                                      ),
+                                    ).copyWith(
+                                      overlayColor: _tvFocusOverlay(context),
+                                    ),
                                 onPressed: () {
                                   context.push(
                                     '/manga-reader/detail',
