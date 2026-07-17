@@ -6,6 +6,7 @@ import 'package:mangayomi/modules/mass_migration/widgets/mass_migration_widgets.
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/utils/language.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 class MassMigrationDestinationScreen extends StatelessWidget {
   const MassMigrationDestinationScreen({required this.sourceGroup, super.key});
@@ -29,6 +30,7 @@ class MassMigrationDestinationScreen extends StatelessWidget {
               ),
             )
           : ListView.separated(
+              padding: tvPageInsets,
               itemCount: sources.length,
               separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {

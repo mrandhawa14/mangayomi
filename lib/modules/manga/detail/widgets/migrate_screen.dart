@@ -26,6 +26,7 @@ import 'package:mangayomi/utils/headers.dart';
 import 'package:mangayomi/utils/language.dart';
 import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 class MigrationScreen extends ConsumerStatefulWidget {
   final Manga manga;
@@ -108,6 +109,7 @@ class _MigrationScreenScreenState extends ConsumerState<MigrationScreen> {
           _query.isNotEmpty ||
               (widget.manga.name != null && widget.manga.author != null)
           ? SuperListView.builder(
+              padding: tvPageInsets,
               itemCount: sourceList.length,
               extentPrecalculationPolicy: SuperPrecalculationPolicy(),
               itemBuilder: (context, index) {
