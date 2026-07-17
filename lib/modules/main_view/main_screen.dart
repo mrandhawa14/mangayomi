@@ -353,6 +353,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
     if (dest.contains("/MangaLibrary")) {
       destinations[dest.indexOf("/MangaLibrary")] = NavigationRailDestination(
+        // Even breathing room between tabs on TV; null off-TV.
+        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: const Icon(Icons.collections_bookmark),
         icon: const Icon(Icons.collections_bookmark_outlined),
         label: Padding(
@@ -363,6 +365,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
     if (dest.contains("/AnimeLibrary")) {
       destinations[dest.indexOf("/AnimeLibrary")] = NavigationRailDestination(
+        // Even breathing room between tabs on TV; null off-TV.
+        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: const Icon(Icons.video_collection),
         icon: const Icon(Icons.video_collection_outlined),
         label: Padding(
@@ -373,6 +377,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
     if (dest.contains("/NovelLibrary")) {
       destinations[dest.indexOf("/NovelLibrary")] = NavigationRailDestination(
+        // Even breathing room between tabs on TV; null off-TV.
+        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: const Icon(Icons.local_library),
         icon: const Icon(Icons.local_library_outlined),
         label: Padding(
@@ -383,6 +389,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
     if (dest.contains("/updates")) {
       destinations[dest.indexOf("/updates")] = NavigationRailDestination(
+        // Even breathing room between tabs on TV; null off-TV.
+        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: _UpdatesBadgeWidget(
           icon: const Icon(Icons.new_releases),
           ref: ref,
@@ -405,6 +413,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
     if (dest.contains("/history")) {
       destinations[dest.indexOf("/history")] = NavigationRailDestination(
+        // Even breathing room between tabs on TV; null off-TV.
+        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: const Icon(Icons.history),
         icon: const Icon(Icons.history_outlined),
         label: Padding(
@@ -415,6 +425,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
     if (dest.contains("/browse")) {
       destinations[dest.indexOf("/browse")] = NavigationRailDestination(
+        // Even breathing room between tabs on TV; null off-TV.
+        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: _ExtensionBadgeWidget(
           icon: const Icon(Icons.explore),
           ref: ref,
@@ -431,6 +443,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
     if (dest.contains("/more")) {
       destinations[dest.indexOf("/more")] = NavigationRailDestination(
+        // Even breathing room between tabs on TV; null off-TV.
+        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: const Icon(Icons.more_horiz),
         icon: const Icon(Icons.more_horiz_outlined),
         label: Padding(
@@ -441,6 +455,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
     if (dest.contains("/trackerLibrary")) {
       destinations[dest.indexOf("/trackerLibrary")] = NavigationRailDestination(
+        // Even breathing room between tabs on TV; null off-TV.
+        padding: isTv ? const EdgeInsets.symmetric(vertical: 6) : null,
         selectedIcon: const Icon(Icons.account_tree),
         icon: const Icon(Icons.account_tree_outlined),
         label: Padding(
@@ -741,6 +757,9 @@ class _TabletLayoutState extends State<_TabletLayout> {
     Widget navRail = NavigationRail(
       labelType: NavigationRailLabelType.all,
       useIndicator: true,
+      // Centre the tabs rather than bunching them under the logo with dead
+      // space below. Off-TV keeps the default top alignment.
+      groupAlignment: isTv ? 0.0 : null,
       // Brand the rail on TV: the app glyph, then the beta flag under it.
       leading: isTv ? const _TvRailHeader() : null,
       // A TV is read from across a room, so the desktop defaults (24px icons,
@@ -786,7 +805,11 @@ class _TabletLayoutState extends State<_TabletLayout> {
     Widget row = Row(
       children: [
         AnimatedContainer(
-          duration: const Duration(milliseconds: 0),
+          // The rail collapses to zero width when a reader or player opens, so
+          // on TV give that a real transition instead of snapping. Off-TV keeps
+          // the original instant behaviour.
+          duration: Duration(milliseconds: isTv ? 220 : 0),
+          curve: Curves.easeOutCubic,
           width: railWidth,
           child: Stack(
             children: [
