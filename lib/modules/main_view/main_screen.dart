@@ -753,7 +753,6 @@ class _TabletLayoutState extends State<_TabletLayout> {
       });
     }
 
-    final scheme = Theme.of(context).colorScheme;
     Widget navRail = NavigationRail(
       labelType: NavigationRailLabelType.all,
       useIndicator: true,
@@ -762,27 +761,6 @@ class _TabletLayoutState extends State<_TabletLayout> {
       groupAlignment: isTv ? 0.0 : null,
       // Brand the rail on TV: the app glyph, then the beta flag under it.
       leading: isTv ? const _TvRailHeader() : null,
-      // A TV is read from across a room, so the desktop defaults (24px icons,
-      // regular labels) are undersized. Colours are restated rather than left
-      // null, because supplying an IconThemeData/TextStyle replaces the rail's
-      // own defaults wholesale and would otherwise drop the selected and
-      // unselected colouring. All null off TV, so desktop keeps its defaults.
-      selectedIconTheme: isTv
-          ? IconThemeData(size: 28, color: scheme.onSecondaryContainer)
-          : null,
-      unselectedIconTheme: isTv
-          ? IconThemeData(size: 28, color: scheme.onSurfaceVariant)
-          : null,
-      selectedLabelTextStyle: isTv
-          ? TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: scheme.onSurface,
-            )
-          : null,
-      unselectedLabelTextStyle: isTv
-          ? TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)
-          : null,
       destinations: destinations,
       selectedIndex:
           (widget.currentIndex >= 0 &&
