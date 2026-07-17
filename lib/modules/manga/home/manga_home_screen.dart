@@ -380,6 +380,9 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                 )
               : IconButton(
                   splashRadius: 20,
+                  focusColor: isTv
+                      ? context.primaryColor.withValues(alpha: 0.4)
+                      : null,
                   onPressed: () {
                     setState(() {
                       _isSearch = true;
