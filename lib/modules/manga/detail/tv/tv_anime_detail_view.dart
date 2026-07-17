@@ -35,7 +35,7 @@ class TvAnimeDetailView extends ConsumerStatefulWidget {
 }
 
 class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
-  static const _actionCount = 7;
+  static const _actionCount = 8;
   late final List<FocusNode> _actionFocus;
   final _rootFocus = FocusNode(debugLabel: 'tvDetailRoot');
   final _topBarFocus = FocusNode(debugLabel: 'tvDetailTopBar');
@@ -230,6 +230,12 @@ class _TvAnimeDetailViewState extends ConsumerState<TvAnimeDetailView> {
                               ),
                               onMigrate: () =>
                                   context.push('/migrate', extra: manga),
+                              // Seeded: this manga's source floats to the top
+                              // of the source list.
+                              onMassMigrate: () => context.push(
+                                '/massMigration',
+                                extra: (manga.itemType, manga),
+                              ),
                               onExitUp: () => _topBarFocus.requestFocus(),
                             ),
                           ),
@@ -409,6 +415,7 @@ class _LeftInfo extends StatelessWidget {
     required this.onRecommendations,
     required this.onWatchOrder,
     required this.onMigrate,
+    required this.onMassMigrate,
     required this.onExitUp,
   });
 
@@ -425,6 +432,7 @@ class _LeftInfo extends StatelessWidget {
   final VoidCallback onRecommendations;
   final VoidCallback onWatchOrder;
   final VoidCallback onMigrate;
+  final VoidCallback onMassMigrate;
   final VoidCallback onExitUp;
 
   @override
@@ -564,57 +572,62 @@ class _LeftInfo extends StatelessWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 220),
               child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _VActionButton(
-                        focusNode: actionFocus[1],
-                        accent: accent,
-                        icon: favorite
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        label: favorite ? 'In Library' : 'Add to Library',
-                        onPressed: onToggleLibrary,
-                      ),
-                      _VActionButton(
-                        focusNode: actionFocus[2],
-                        accent: accent,
-                        icon: Icons.label_outline,
-                        label: 'Categories',
-                        onPressed: onCategories,
-                      ),
-                      _VActionButton(
-                        focusNode: actionFocus[3],
-                        accent: accent,
-                        icon: Icons.public,
-                        label: 'Open in browser',
-                        onPressed: onBrowser,
-                      ),
-                      _VActionButton(
-                        focusNode: actionFocus[4],
-                        accent: accent,
-                        icon: Icons.recommend_outlined,
-                        label: 'Recommendations',
-                        onPressed: onRecommendations,
-                      ),
-                      _VActionButton(
-                        focusNode: actionFocus[5],
-                        accent: accent,
-                        icon: Icons.format_list_numbered,
-                        label: 'Watch order',
-                        onPressed: onWatchOrder,
-                      ),
-                      _VActionButton(
-                        focusNode: actionFocus[6],
-                        accent: accent,
-                        icon: Icons.swap_horiz,
-                        label: 'Migrate',
-                        onPressed: onMigrate,
-                      ),
-                    ],
-                  ),
+                child: Column(
+                  children: [
+                    _VActionButton(
+                      focusNode: actionFocus[1],
+                      accent: accent,
+                      icon: favorite ? Icons.favorite : Icons.favorite_border,
+                      label: favorite ? 'In Library' : 'Add to Library',
+                      onPressed: onToggleLibrary,
+                    ),
+                    _VActionButton(
+                      focusNode: actionFocus[2],
+                      accent: accent,
+                      icon: Icons.label_outline,
+                      label: 'Categories',
+                      onPressed: onCategories,
+                    ),
+                    _VActionButton(
+                      focusNode: actionFocus[3],
+                      accent: accent,
+                      icon: Icons.public,
+                      label: 'Open in browser',
+                      onPressed: onBrowser,
+                    ),
+                    _VActionButton(
+                      focusNode: actionFocus[4],
+                      accent: accent,
+                      icon: Icons.recommend_outlined,
+                      label: 'Recommendations',
+                      onPressed: onRecommendations,
+                    ),
+                    _VActionButton(
+                      focusNode: actionFocus[5],
+                      accent: accent,
+                      icon: Icons.format_list_numbered,
+                      label: 'Watch order',
+                      onPressed: onWatchOrder,
+                    ),
+                    _VActionButton(
+                      focusNode: actionFocus[6],
+                      accent: accent,
+                      icon: Icons.swap_horiz,
+                      label: 'Migrate',
+                      onPressed: onMigrate,
+                    ),
+                    _VActionButton(
+                      focusNode: actionFocus[7],
+                      accent: accent,
+                      icon: Icons.dynamic_feed,
+                      label: 'Migrate source',
+                      onPressed: onMassMigrate,
+                    ),
+                  ],
                 ),
               ),
             ),
+          ),
         ],
       ),
     );

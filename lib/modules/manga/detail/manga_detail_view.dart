@@ -648,7 +648,10 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                 case 6:
                                   context.push(
                                     "/massMigration",
-                                    extra: widget.manga,
+                                    extra: (
+                                      widget.manga!.itemType,
+                                      widget.manga,
+                                    ),
                                   );
                                   break;
                               }

@@ -9,18 +9,24 @@ import 'package:mangayomi/utils/language.dart';
 
 class MassMigrationSourceSelectionScreen extends StatelessWidget {
   const MassMigrationSourceSelectionScreen({
-    required this.initialManga,
+    required this.itemType,
+    this.prioritizedManga,
     super.key,
   });
 
-  final Manga initialManga;
+  /// Which library to group. The screen lists every source in it.
+  final ItemType itemType;
+
+  /// Optional: the manga the user came from, whose source is floated to the
+  /// top. Null when opened as a library-wide tool rather than from a manga.
+  final Manga? prioritizedManga;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final sourceGroups = buildMassMigrationSourceGroups(
-      itemType: initialManga.itemType,
-      prioritizedManga: initialManga,
+      itemType: itemType,
+      prioritizedManga: prioritizedManga,
     );
 
     return Scaffold(
