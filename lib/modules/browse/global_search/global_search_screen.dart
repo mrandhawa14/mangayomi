@@ -23,6 +23,7 @@ import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
 import 'package:mangayomi/modules/widgets/manga_image_card_widget.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:mangayomi/modules/widgets/tv_pill.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 class GlobalSearchScreen extends ConsumerStatefulWidget {
   final String? search;
@@ -105,7 +106,7 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
               itemBuilder: (context, index) {
                 final source = sourceList[index];
                 return SizedBox(
-                  height: 260,
+                  height: isTv ? 290 : 260,
                   child: SourceSearchScreen(
                     key: ValueKey(query),
                     query: query,
@@ -181,7 +182,7 @@ class _SourceSearchScreenState extends ConsumerState<SourceSearchScreen> {
 
     return Scaffold(
       body: SizedBox(
-        height: 260,
+        height: isTv ? 290 : 260,
         child: Column(
           children: [
             ListTile(
@@ -218,6 +219,9 @@ class _SourceSearchScreenState extends ConsumerState<SourceSearchScreen> {
                             extentPrecalculationPolicy:
                                 SuperPrecalculationPolicy(),
                             scrollDirection: Axis.horizontal,
+                            padding: isTv
+                                ? const EdgeInsets.symmetric(horizontal: 8)
+                                : null,
                             itemCount: pages!.list.length,
                             itemBuilder: (context, index) {
                               return MangaGlobalImageCard(
@@ -329,7 +333,12 @@ class _MangaGlobalImageCardState extends ConsumerState<MangaGlobalImageCard>
             builder: (context, snapshot) {
               final hasData = snapshot.hasData && snapshot.data!.isNotEmpty;
               return Padding(
-                padding: const EdgeInsets.only(left: 10),
+                // Room on every side, not just the left: the focused cover
+                // scales up and needs somewhere to grow into, or it collides
+                // with its neighbours and clips at the ends of the strip.
+                padding: isTv
+                    ? const EdgeInsets.symmetric(horizontal: 8, vertical: 8)
+                    : const EdgeInsets.only(left: 10),
                 child: Stack(
                   children: [
                     SizedBox(
