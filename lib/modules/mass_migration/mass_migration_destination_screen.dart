@@ -7,6 +7,8 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/utils/language.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:mangayomi/modules/widgets/tv_row_button.dart';
+import 'package:mangayomi/l10n/generated/app_localizations.dart';
 
 class MassMigrationDestinationScreen extends StatelessWidget {
   const MassMigrationDestinationScreen({required this.sourceGroup, super.key});
@@ -64,6 +66,24 @@ class _DestinationSourceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    // Matches the Browse rows: focusable target plus the band and fade.
+    if (isTv) {
+      return TvListRow(
+        children: [
+          Expanded(
+            child: TvRowButton(onTap: onTap, child: _tile(context, l10n)),
+          ),
+        ],
+      );
+    }
+    return _tile(context, l10n, onTap: onTap);
+  }
+
+  Widget _tile(
+    BuildContext context,
+    AppLocalizations l10n, {
+    VoidCallback? onTap,
+  }) {
     return ListTile(
       leading: MassMigrationSourceIcon(source: source),
       title: Text(source.name ?? l10n.mass_migration_unknown_source),

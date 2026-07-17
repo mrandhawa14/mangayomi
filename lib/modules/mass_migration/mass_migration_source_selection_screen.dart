@@ -7,6 +7,7 @@ import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/utils/language.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
+import 'package:mangayomi/modules/widgets/tv_row_button.dart';
 
 class MassMigrationSourceSelectionScreen extends StatelessWidget {
   const MassMigrationSourceSelectionScreen({
@@ -45,6 +46,42 @@ class MassMigrationSourceSelectionScreen extends StatelessWidget {
               separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final sourceGroup = sourceGroups[index];
+                void open() => Navigator.push(
+                  context,
+                  createRoute(
+                    page: MassMigrationPreviewScreen(sourceGroup: sourceGroup),
+                  ),
+                );
+                // The Browse row treatment: one focusable target, plus the lit
+                // band and the fade, so the list behaves like every other TV
+                // list rather than a bare tile.
+                if (isTv) {
+                  return TvListRow(
+                    children: [
+                      Expanded(
+                        child: TvRowButton(
+                          onTap: open,
+                          child: ListTile(
+                            leading: MassMigrationSourceIcon(
+                              source: sourceGroup.source,
+                            ),
+                            title: Text(sourceGroup.sourceName),
+                            subtitle: Text(
+                              [
+                                if ((sourceGroup.lang ?? '').isNotEmpty)
+                                  completeLanguageName(sourceGroup.lang!),
+                                l10n.mass_migration_item_count(
+                                  sourceGroup.count,
+                                ),
+                              ].join(' • '),
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }
                 return ListTile(
                   leading: MassMigrationSourceIcon(source: sourceGroup.source),
                   title: Text(sourceGroup.sourceName),
