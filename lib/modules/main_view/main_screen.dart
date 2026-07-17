@@ -1059,7 +1059,9 @@ class _TvRailHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
     return Padding(
-      padding: const EdgeInsets.only(top: 14, bottom: 10),
+      // Tight under the glyph: the first destination already carries its
+      // own vertical padding, so this only needs to clear the beta pill.
+      padding: const EdgeInsets.only(top: 14, bottom: 2),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
