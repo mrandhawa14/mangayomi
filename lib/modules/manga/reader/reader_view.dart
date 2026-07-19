@@ -106,7 +106,13 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(''),
-        leading: BackButton(
+        // IconButton rather than BackButton because only IconButton takes
+        // autofocus. scaffoldWith is only the loading / error / no-pages states,
+        // whose bodies have nothing focusable, so without this the d-pad has no
+        // starting point on TV and cannot even reach this back button.
+        leading: IconButton(
+          autofocus: isTv,
+          icon: const BackButtonIcon(),
           onPressed: () {
             if (restoreUi) {
               restoreSystemUI();

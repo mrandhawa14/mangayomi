@@ -6,6 +6,7 @@ import 'package:mangayomi/main.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/modules/manga/detail/widgets/migrate_screen.dart';
 import 'package:mangayomi/services/update_errors_provider.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 /// Persistent list of the last library update's failures. Each entry can be
 /// dismissed or migrated away, so recurring source failures don't have to be
@@ -19,6 +20,15 @@ class UpdateErrorsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Update errors'),
+        // On TV the empty body has nothing focusable, so autofocus an explicit
+        // back button; otherwise the d-pad cannot reach the auto-implied one.
+        leading: isTv
+            ? IconButton(
+                autofocus: true,
+                icon: const BackButtonIcon(),
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : null,
         actions: [
           if (errors.isNotEmpty)
             IconButton(

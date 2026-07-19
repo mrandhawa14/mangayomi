@@ -128,7 +128,11 @@ class _AnimePlayerViewState extends riv.ConsumerState<AnimePlayerView> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
           title: const Text(''),
-          leading: BackButton(
+          leading: IconButton(
+            // The error body is just text, so focus this or the remote is stuck.
+            // IconButton, not BackButton, because only it takes autofocus.
+            autofocus: isTv,
+            icon: const BackButtonIcon(),
             onPressed: () {
               restoreSystemUI();
               Navigator.pop(context);
@@ -143,8 +147,12 @@ class _AnimePlayerViewState extends riv.ConsumerState<AnimePlayerView> {
           extendBodyBehindAppBar: true,
           appBar: AppBar(
             title: const Text(''),
-            leading: BackButton(
+            leading: IconButton(
               color: Colors.white,
+              // Lets the remote bail out of a hung load. IconButton, not
+              // BackButton, because only it takes autofocus.
+              autofocus: isTv,
+              icon: const BackButtonIcon(),
               onPressed: () {
                 restoreSystemUI();
                 Navigator.pop(context);

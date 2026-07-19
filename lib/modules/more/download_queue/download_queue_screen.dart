@@ -87,7 +87,16 @@ class DownloadQueueScreen extends ConsumerWidget {
           }
           if (entries.isEmpty) {
             return Scaffold(
-              appBar: AppBar(title: Text(l10n!.download_queue)),
+              appBar: AppBar(
+                title: Text(l10n!.download_queue),
+                leading: isTv
+                    ? IconButton(
+                        autofocus: true,
+                        icon: const BackButtonIcon(),
+                        onPressed: () => Navigator.of(context).pop(),
+                      )
+                    : null,
+              ),
               body: Center(child: Text(l10n.no_downloads)),
             );
           }
@@ -258,7 +267,16 @@ class DownloadQueueScreen extends ConsumerWidget {
           );
         }
         return Scaffold(
-          appBar: AppBar(title: Text(l10n!.download_queue)),
+          appBar: AppBar(
+            title: Text(l10n!.download_queue),
+            leading: isTv
+                ? IconButton(
+                    autofocus: true,
+                    icon: const BackButtonIcon(),
+                    onPressed: () => Navigator.of(context).pop(),
+                  )
+                : null,
+          ),
           body: Center(child: Text(l10n.no_downloads)),
         );
       },
