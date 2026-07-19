@@ -128,10 +128,16 @@ class TvRowButton extends StatefulWidget {
     required this.child,
     this.focusNode,
     this.autofocus = false,
+    this.onLongPress,
   });
   final VoidCallback onTap;
   final Widget child;
   final FocusNode? focusNode;
+
+  /// Optional held-OK action. A remote reports a held OK as key repeats, never
+  /// as a pointer long-press, so when this is set the button resolves both tap
+  /// and hold on key release, exactly like [TvPill].
+  final VoidCallback? onLongPress;
 
   /// Claim focus on first build. Set on the first row of a pushed list (mass
   /// migration, etc.) that has no nav rail to hand focus over, so the remote
@@ -144,6 +150,7 @@ class TvRowButton extends StatefulWidget {
 
 class _TvRowButtonState extends State<TvRowButton> {
   bool _focused = false;
+  bool _held = false;
 
   @override
   Widget build(BuildContext context) {
@@ -163,14 +170,38 @@ class _TvRowButtonState extends State<TvRowButton> {
         }
       },
       onKeyEvent: (node, event) {
-        if (event is KeyDownEvent && tvIsSelectKey(event.logicalKey)) {
-          widget.onTap();
+        if (!tvIsSelectKey(event.logicalKey)) return KeyEventResult.ignored;
+        final longPress = widget.onLongPress;
+        // Without a hold action, fire on key-down as before. With one, both
+        // tap and hold resolve on release so a hold never also taps.
+        if (longPress == null) {
+          if (event is KeyDownEvent) {
+            widget.onTap();
+          }
+          return KeyEventResult.handled;
+        }
+        if (event is KeyDownEvent) {
+          _held = false;
+          return KeyEventResult.handled;
+        }
+        if (event is KeyRepeatEvent) {
+          _held = true;
+          return KeyEventResult.handled;
+        }
+        if (event is KeyUpEvent) {
+          if (_held) {
+            longPress();
+          } else {
+            widget.onTap();
+          }
+          _held = false;
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
       },
       child: GestureDetector(
         onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 130),
           curve: Curves.easeOut,

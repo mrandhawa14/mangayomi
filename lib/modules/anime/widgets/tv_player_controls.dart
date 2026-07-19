@@ -197,157 +197,160 @@ class _TvPlayerControlsState extends State<TvPlayerControls> {
         },
         child: FocusScope(
           node: _scope,
-      // Only build the controls (and their per-frame StreamBuilders) while
-      // visible. Otherwise the seek/time streams rebuild ~4x/sec during
-      // playback and jank the Fire TV — hidden means nothing to render.
-      child: !_visible
-          ? const SizedBox.expand()
-          : Stack(
-              children: [
-              // Scrim so white controls read over any frame.
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.55),
-                        Colors.black.withValues(alpha: 0.15),
-                        Colors.black.withValues(alpha: 0.65),
-                      ],
-                      stops: const [0.0, 0.45, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-              // Top-left: back / restart / autoplay (gear lives by the pills).
-              Positioned(
-                top: safeV,
-                left: safeH,
-                child: Row(
+          // Only build the controls (and their per-frame StreamBuilders) while
+          // visible. Otherwise the seek/time streams rebuild ~4x/sec during
+          // playback and jank the Fire TV — hidden means nothing to render.
+          child: !_visible
+              ? const SizedBox.expand()
+              : Stack(
                   children: [
-                    _TvFocusable(
-                      accent: accent,
-                      onPressed: widget.onBack,
-                      child: const Icon(Icons.arrow_back, color: Colors.white),
-                    ),
-                    const SizedBox(width: 8),
-                    _TvFocusable(
-                      accent: accent,
-                      onPressed: widget.onRestart,
-                      child: const Icon(
-                        Icons.replay_outlined,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Autoplay-next — YouTube-style labelled switch.
-                    Consumer(
-                      builder: (context, ref, _) {
-                        final on = ref.watch(autoPlayNextEpisodeProvider);
-                        return _AutoplayToggle(
-                          accent: accent,
-                          on: on,
-                          onToggle: () => ref
-                              .read(autoPlayNextEpisodeProvider.notifier)
-                              .toggle(),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              // Top-right: title + episode.
-              Positioned(
-                top: safeV,
-                right: safeH,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (widget.title.isNotEmpty)
-                      Text(
-                        widget.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    if (widget.episodeLabel.isNotEmpty)
-                      Text(
-                        widget.episodeLabel,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              // Bottom: controls + seek + tracks.
-              Positioned(
-                left: safeH,
-                right: safeH,
-                bottom: safeV,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Play/pause inline on the left of the seek line. Default
-                    // focus + highlighted; OK on the seek bar also toggles it.
-                    Row(
-                      children: [
-                        _PlayPauseButton(
-                          player: widget.player,
-                          accent: accent,
-                          focusNode: _playFocus,
-                        ),
-                        const SizedBox(width: 14),
-                        _PositionText(player: widget.player),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _TvSeekBar(
-                            player: widget.player,
-                            accent: accent,
+                    // Scrim so white controls read over any frame.
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.55),
+                              Colors.black.withValues(alpha: 0.15),
+                              Colors.black.withValues(alpha: 0.65),
+                            ],
+                            stops: const [0.0, 0.45, 1.0],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        _RemainingText(player: widget.player),
-                        // Manual skip to the next episode (autoplay still
-                        // auto-advances at the end); shown only if there is one.
-                        if (widget.hasNext) ...[
+                      ),
+                    ),
+                    // Top-left: back / restart / autoplay (gear lives by the pills).
+                    Positioned(
+                      top: safeV,
+                      left: safeH,
+                      child: Row(
+                        children: [
+                          _TvFocusable(
+                            accent: accent,
+                            onPressed: widget.onBack,
+                            child: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                            ),
+                          ),
                           const SizedBox(width: 8),
                           _TvFocusable(
                             accent: accent,
-                            onPressed: widget.onNext,
-                            // Match the play/pause size (34) so the two
-                            // transport controls frame the seek bar evenly.
+                            onPressed: widget.onRestart,
                             child: const Icon(
-                              Icons.skip_next,
+                              Icons.replay_outlined,
                               color: Colors.white,
-                              size: 34,
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          // Autoplay-next — YouTube-style labelled switch.
+                          Consumer(
+                            builder: (context, ref, _) {
+                              final on = ref.watch(autoPlayNextEpisodeProvider);
+                              return _AutoplayToggle(
+                                accent: accent,
+                                on: on,
+                                onToggle: () => ref
+                                    .read(autoPlayNextEpisodeProvider.notifier)
+                                    .toggle(),
+                              );
+                            },
+                          ),
                         ],
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    // Quality | Subtitles | Speed | Settings pills.
-                    _PillBar(
-                      player: widget.player,
-                      accent: accent,
-                      qualityListenable: widget.qualityListenable,
-                      buildQualityOptions: widget.buildQualityOptions,
-                      onSettings: widget.onSettings,
-                      speedListenable: widget.speedListenable,
-                      onSetSpeed: widget.onSetSpeed,
+                    // Top-right: title + episode.
+                    Positioned(
+                      top: safeV,
+                      right: safeH,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (widget.title.isNotEmpty)
+                            Text(
+                              widget.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          if (widget.episodeLabel.isNotEmpty)
+                            Text(
+                              widget.episodeLabel,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // Bottom: controls + seek + tracks.
+                    Positioned(
+                      left: safeH,
+                      right: safeH,
+                      bottom: safeV,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Play/pause inline on the left of the seek line. Default
+                          // focus + highlighted; OK on the seek bar also toggles it.
+                          Row(
+                            children: [
+                              _PlayPauseButton(
+                                player: widget.player,
+                                accent: accent,
+                                focusNode: _playFocus,
+                              ),
+                              const SizedBox(width: 14),
+                              _PositionText(player: widget.player),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _TvSeekBar(
+                                  player: widget.player,
+                                  accent: accent,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              _RemainingText(player: widget.player),
+                              // Manual skip to the next episode (autoplay still
+                              // auto-advances at the end); shown only if there is one.
+                              if (widget.hasNext) ...[
+                                const SizedBox(width: 8),
+                                _TvFocusable(
+                                  accent: accent,
+                                  onPressed: widget.onNext,
+                                  // Match the play/pause size (34) so the two
+                                  // transport controls frame the seek bar evenly.
+                                  child: const Icon(
+                                    Icons.skip_next,
+                                    color: Colors.white,
+                                    size: 34,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          // Quality | Subtitles | Speed | Settings pills.
+                          _PillBar(
+                            player: widget.player,
+                            accent: accent,
+                            qualityListenable: widget.qualityListenable,
+                            buildQualityOptions: widget.buildQualityOptions,
+                            onSettings: widget.onSettings,
+                            speedListenable: widget.speedListenable,
+                            onSetSpeed: widget.onSetSpeed,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -542,9 +545,7 @@ class _PillBar extends StatelessWidget {
                         label: _trackLabel(s.title, s.language, s.id),
                         selected: s.id == current.subtitle.id,
                         onTap: () => player.setSubtitleTrack(
-                          s.id == current.subtitle.id
-                              ? SubtitleTrack.no()
-                              : s,
+                          s.id == current.subtitle.id ? SubtitleTrack.no() : s,
                         ),
                       ),
                   ]);
@@ -843,14 +844,13 @@ class _AutoplayToggleState extends State<_AutoplayToggle> {
       ),
     );
   }
-
 }
 
 /// A drawn play/pause autoplay toggle (no asset): a pill track with a circular
 /// black knob that slides right + shows ▶ when on, left + shows ⏸ when off —
 /// matching the reference toggle style.
 class AutoplaySwitch extends StatelessWidget {
-  const AutoplaySwitch({required this.on, required this.accent});
+  const AutoplaySwitch({super.key, required this.on, required this.accent});
 
   final bool on;
   final Color accent;
@@ -1029,7 +1029,10 @@ class _TvSeekBarState extends State<_TvSeekBar> {
       _holdCount++;
     }
     // +10s per 3 repeats held: 10 → 20 → 30 … capped.
-    final secs = (_baseStep + (_holdCount ~/ 3) * 10).clamp(_baseStep, _maxStep);
+    final secs = (_baseStep + (_holdCount ~/ 3) * 10).clamp(
+      _baseStep,
+      _maxStep,
+    );
     return Duration(seconds: secs);
   }
 
@@ -1118,47 +1121,47 @@ class _TvSeekBarState extends State<_TvSeekBar> {
                     onHorizontalDragUpdate: (d) =>
                         _seekToFraction(d.localPosition.dx / w),
                     child: Stack(
-                    children: [
-                      // Track + progress, vertically centred.
-                      Align(
-                        alignment: Alignment.center,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(barH / 2),
-                          child: SizedBox(
-                            height: barH,
-                            width: w,
-                            child: LinearProgressIndicator(
-                              value: frac,
-                              backgroundColor: Colors.white24,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                widget.accent,
+                      children: [
+                        // Track + progress, vertically centred.
+                        Align(
+                          alignment: Alignment.center,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(barH / 2),
+                            child: SizedBox(
+                              height: barH,
+                              width: w,
+                              child: LinearProgressIndicator(
+                                value: frac,
+                                backgroundColor: Colors.white24,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  widget.accent,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      // Scrubber handle at the current position when focused —
-                      // the focus affordance instead of an outline.
-                      if (_focused)
-                        Positioned(
-                          left: (frac * (w - knob)).clamp(0.0, w - knob),
-                          top: (16 - knob) / 2,
-                          child: Container(
-                            width: knob,
-                            height: knob,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.4),
-                                  blurRadius: 3,
-                                ),
-                              ],
+                        // Scrubber handle at the current position when focused —
+                        // the focus affordance instead of an outline.
+                        if (_focused)
+                          Positioned(
+                            left: (frac * (w - knob)).clamp(0.0, w - knob),
+                            top: (16 - knob) / 2,
+                            child: Container(
+                              width: knob,
+                              height: knob,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.4),
+                                    blurRadius: 3,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
                     ),
                   );
                 },

@@ -10,6 +10,8 @@ import 'package:mangayomi/modules/mass_migration/widgets/mass_migration_widgets.
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/get_detail.dart';
 import 'package:mangayomi/utils/language.dart';
+import 'package:mangayomi/modules/widgets/tv_menu.dart';
+import 'package:mangayomi/utils/platform_utils.dart';
 
 enum _MassMigrationPhase { matching, review, applying, summary }
 
@@ -614,6 +616,28 @@ class _MassMigrationRunnerScreenState
 
   Future<void> _pickAnotherCandidate(int index) async {
     final item = _resolvedItems[index];
+    // A bottom sheet is a poor remote target on TV: it opens at the screen
+    // edge and nothing establishes focus inside it. It is a pick-one list, so
+    // pop the centred, d-pad driven menu there instead.
+    if (isTv) {
+      final candidates = item.searchResult.candidates;
+      final picked = await showTvMenu(
+        context,
+        title: context.l10n.mass_migration_choose_another_result,
+        options: [
+          for (final c in candidates)
+            TvMenuOption(
+              [
+                c.name ?? context.l10n.mass_migration_unknown_title,
+                if ((c.author ?? '').trim().isNotEmpty) c.author!,
+              ].join(' • '),
+            ),
+        ],
+      );
+      if (picked == null || !mounted) return;
+      await _applyCandidate(index, item, candidates[picked]);
+      return;
+    }
     final selected = await showModalBottomSheet<MManga>(
       context: context,
       builder: (context) {
@@ -645,7 +669,16 @@ class _MassMigrationRunnerScreenState
     );
 
     if (selected == null || !mounted) return;
+    await _applyCandidate(index, item, selected);
+  }
 
+  /// Loads the picked candidate's detail and swaps it into the item; shared by
+  /// the bottom sheet off-TV and the centred TV menu.
+  Future<void> _applyCandidate(
+    int index,
+    MassMigrationResolvedItem item,
+    MManga selected,
+  ) async {
     setState(() {
       _loadingCandidateIndexes.add(index);
     });

@@ -568,63 +568,83 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                           filters = filterList;
                         }
                         if (index == 2) {
-                          final result = await showModalBottomSheet(
-                            context: context,
-                            builder: (context) => StatefulBuilder(
-                              builder: (context, setState) {
-                                return Column(
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Row(
-                                        children: [
-                                          TextButton(
-                                            onPressed: () {
-                                              setState(() {
-                                                filters = getFilterList(
-                                                  source: source,
-                                                );
-                                              });
-                                            },
-                                            child: Text(l10n.reset),
+                          // The same filter content, but centred on TV: a
+                          // bottom sheet opens at the screen edge with no
+                          // established focus, which strands the remote.
+                          Widget sheet(BuildContext context) => StatefulBuilder(
+                            builder: (context, setState) {
+                              return Column(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Row(
+                                      children: [
+                                        TextButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              filters = getFilterList(
+                                                source: source,
+                                              );
+                                            });
+                                          },
+                                          child: Text(l10n.reset),
+                                        ),
+                                        const Spacer(),
+                                        ElevatedButton(
+                                          autofocus: isTv,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                context.primaryColor,
                                           ),
-                                          const Spacer(),
-                                          ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor:
-                                                  context.primaryColor,
-                                            ),
-                                            onPressed: () {
-                                              Navigator.pop(context, 'filter');
-                                            },
-                                            child: Text(
-                                              l10n.filter,
-                                              style: TextStyle(
-                                                color: Theme.of(
-                                                  context,
-                                                ).scaffoldBackgroundColor,
-                                              ),
+                                          onPressed: () {
+                                            Navigator.pop(context, 'filter');
+                                          },
+                                          child: Text(
+                                            l10n.filter,
+                                            style: TextStyle(
+                                              color: Theme.of(
+                                                context,
+                                              ).scaffoldBackgroundColor,
                                             ),
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
-                                    const Divider(),
-                                    Expanded(
-                                      child: FilterWidget(
-                                        filterList: filters,
-                                        onChanged: (values) {
-                                          setState(() {
-                                            filters = values;
-                                          });
-                                        },
-                                      ),
+                                  ),
+                                  const Divider(),
+                                  Expanded(
+                                    child: FilterWidget(
+                                      filterList: filters,
+                                      onChanged: (values) {
+                                        setState(() {
+                                          filters = values;
+                                        });
+                                      },
                                     ),
-                                  ],
-                                );
-                              },
-                            ),
+                                  ),
+                                ],
+                              );
+                            },
                           );
+                          final result = isTv
+                              ? await showDialog(
+                                  context: context,
+                                  builder: (ctx) => Dialog(
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth: 460,
+                                        maxHeight:
+                                            MediaQuery.of(ctx).size.height *
+                                            0.75,
+                                      ),
+                                      child: sheet(ctx),
+                                    ),
+                                  ),
+                                )
+                              : await showModalBottomSheet(
+                                  context: context,
+                                  builder: sheet,
+                                );
                           if (result == 'filter') {
                             _mangaList.clear();
                             if (mounted) {

@@ -114,7 +114,13 @@ class _TvPillState extends State<TvPill> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 130),
           curve: Curves.easeOut,
-          transform: Matrix4.identity()..scale(_focused ? 1.08 : 1.0),
+          transform: Matrix4.identity()
+            ..scaleByDouble(
+              _focused ? 1.08 : 1.0,
+              _focused ? 1.08 : 1.0,
+              _focused ? 1.08 : 1.0,
+              1,
+            ),
           transformAlignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
           decoration: BoxDecoration(

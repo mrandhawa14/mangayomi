@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:mangayomi/modules/widgets/tv_pill.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 
@@ -40,6 +42,9 @@ class CoverViewWidget extends StatefulWidget {
 }
 
 class _CoverViewWidgetState extends State<CoverViewWidget> {
+  // Held-OK tracking for the TV long-press (see the Focus wrapper in build).
+  bool _held = false;
+
   // Whether the card should draw a focus ring. Only set when focus arrives via
   // keyboard / d-pad navigation (FocusHighlightMode.traditional), so touch
   // input on phones/tablets never shows a ring. Gives d-pad/remote users on
@@ -90,7 +95,15 @@ class _CoverViewWidgetState extends State<CoverViewWidget> {
     // placed inside the card. Render it once, and only when provided.
     final showBottomText =
         widget.isComfortableGrid && widget.bottomTextWidget != null;
-    return Padding(
+    // Matrix4.scale is deprecated in favour of the explicit per-axis form.
+    final pop = _focused ? 1.06 : 1.0;
+    // An InkWell's keyboard activation only ever fires onTap, so a remote
+    // could not reach the long-press actions at all (library multi-select,
+    // most importantly). On TV, when a long-press exists, intercept the select
+    // key above the InkWell and resolve tap vs hold on release, exactly like
+    // TvPill: press-and-release opens, press-and-hold selects. The wrapper
+    // takes no focus of its own; it only sees keys bubbling from the InkWell.
+    Widget card = Padding(
       padding: const EdgeInsets.all(5),
       child: Column(
         children: [
@@ -99,7 +112,7 @@ class _CoverViewWidgetState extends State<CoverViewWidget> {
               duration: const Duration(milliseconds: 130),
               curve: Curves.easeOut,
               // Focus "pop" — the focused cover lifts slightly, TV-style.
-              transform: Matrix4.identity()..scale(_focused ? 1.06 : 1.0),
+              transform: Matrix4.identity()..scaleByDouble(pop, pop, pop, 1),
               transformAlignment: Alignment.center,
               decoration: BoxDecoration(
                 // Outer radius = inner clip radius (5) + border width (3) so the
@@ -167,5 +180,35 @@ class _CoverViewWidgetState extends State<CoverViewWidget> {
         ],
       ),
     );
+    final longPress = widget.onLongPress;
+    if (isTv && longPress != null) {
+      card = Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onKeyEvent: (node, event) {
+          if (!tvIsSelectKey(event.logicalKey)) return KeyEventResult.ignored;
+          if (event is KeyDownEvent) {
+            _held = false;
+            return KeyEventResult.handled;
+          }
+          if (event is KeyRepeatEvent) {
+            _held = true;
+            return KeyEventResult.handled;
+          }
+          if (event is KeyUpEvent) {
+            if (_held) {
+              longPress();
+            } else {
+              widget.onTap();
+            }
+            _held = false;
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: card,
+      );
+    }
+    return card;
   }
 }
