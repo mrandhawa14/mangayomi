@@ -7,6 +7,11 @@ class ListTileWidget extends StatelessWidget {
   final IconData icon;
   final String? subtitle;
   final Widget? trailing;
+
+  /// Claim focus on first build. Set on the first row of a pushed menu (the
+  /// settings hub, etc.) so the remote has a starting point instead of being
+  /// stranded on a screen with no established focus.
+  final bool autofocus;
   const ListTileWidget({
     super.key,
     required this.onTap,
@@ -14,11 +19,13 @@ class ListTileWidget extends StatelessWidget {
     required this.icon,
     this.subtitle,
     this.trailing,
+    this.autofocus = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
+      autofocus: autofocus,
       onTap: onTap,
       // subtitle: subtitle != null
       //     ? Text(

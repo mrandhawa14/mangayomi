@@ -38,6 +38,7 @@ class MassMigrationDestinationScreen extends StatelessWidget {
               itemBuilder: (context, index) {
                 final source = sources[index];
                 return _DestinationSourceTile(
+                  autofocus: index == 0,
                   source: source,
                   onTap: () {
                     Navigator.push(
@@ -58,10 +59,15 @@ class MassMigrationDestinationScreen extends StatelessWidget {
 }
 
 class _DestinationSourceTile extends StatelessWidget {
-  const _DestinationSourceTile({required this.source, required this.onTap});
+  const _DestinationSourceTile({
+    required this.source,
+    required this.onTap,
+    this.autofocus = false,
+  });
 
   final Source source;
   final VoidCallback onTap;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +77,11 @@ class _DestinationSourceTile extends StatelessWidget {
       return TvListRow(
         children: [
           Expanded(
-            child: TvRowButton(onTap: onTap, child: _tile(context, l10n)),
+            child: TvRowButton(
+              autofocus: autofocus,
+              onTap: onTap,
+              child: _tile(context, l10n),
+            ),
           ),
         ],
       );

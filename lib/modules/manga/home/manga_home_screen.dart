@@ -795,6 +795,7 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                                         return buildProgressIndicator();
                                       }
                                       return MangaHomeImageCard(
+                                        autofocus: isTv && index == 0,
                                         itemType: source.itemType,
                                         manga: _mangaList[index],
                                         source: source,
@@ -912,6 +913,7 @@ class MangaHomeImageCard extends ConsumerStatefulWidget {
   final Source source;
   final bool isComfortableGrid;
   final Manga? libraryManga;
+  final bool autofocus;
   const MangaHomeImageCard({
     super.key,
     required this.manga,
@@ -919,6 +921,7 @@ class MangaHomeImageCard extends ConsumerStatefulWidget {
     required this.itemType,
     required this.isComfortableGrid,
     this.libraryManga,
+    this.autofocus = false,
   });
 
   @override
@@ -933,6 +936,7 @@ class _MangaHomeImageCardState extends ConsumerState<MangaHomeImageCard> {
       source: widget.source,
       itemType: widget.itemType,
       isComfortableGrid: widget.isComfortableGrid,
+      autofocus: widget.autofocus,
       libraryManga: widget.libraryManga,
     );
   }

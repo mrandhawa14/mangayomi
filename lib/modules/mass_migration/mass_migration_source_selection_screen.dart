@@ -60,6 +60,7 @@ class MassMigrationSourceSelectionScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: TvRowButton(
+                          autofocus: index == 0,
                           onTap: open,
                           child: ListTile(
                             leading: MassMigrationSourceIcon(

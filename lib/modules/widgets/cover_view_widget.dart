@@ -160,6 +160,9 @@ class _CoverViewWidgetState extends State<CoverViewWidget> {
               ),
             ),
           ),
+          // A small gap so the focused card's 3px ring (and its slight scale)
+          // clears the title below instead of bleeding onto it.
+          if (showBottomText) const SizedBox(height: 4),
           if (showBottomText) widget.bottomTextWidget!,
         ],
       ),

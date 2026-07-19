@@ -21,6 +21,7 @@ class SettingsScreen extends StatelessWidget {
         child: Column(
           children: [
             ListTileWidget(
+              autofocus: isTv,
               title: l10n.general,
               icon: Icons.settings,
               onTap: () => context.push('/general'),

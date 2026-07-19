@@ -127,10 +127,16 @@ class TvRowButton extends StatefulWidget {
     required this.onTap,
     required this.child,
     this.focusNode,
+    this.autofocus = false,
   });
   final VoidCallback onTap;
   final Widget child;
   final FocusNode? focusNode;
+
+  /// Claim focus on first build. Set on the first row of a pushed list (mass
+  /// migration, etc.) that has no nav rail to hand focus over, so the remote
+  /// has a starting point instead of being stranded.
+  final bool autofocus;
 
   @override
   State<TvRowButton> createState() => _TvRowButtonState();
@@ -144,6 +150,7 @@ class _TvRowButtonState extends State<TvRowButton> {
     final accent = context.primaryColor;
     return Focus(
       focusNode: widget.focusNode,
+      autofocus: widget.autofocus,
       onFocusChange: (f) {
         setState(() => _focused = f);
         if (f && context.mounted && Scrollable.maybeOf(context) != null) {
