@@ -397,6 +397,55 @@ end""",
       });
     }
 
+    _seedBetaDefaults(isar);
     return isar;
+  }
+
+  // Beta test-build convenience: on a fresh database, seed two anime extension
+  // repos and default the app to dark mode so testers do not have to set either
+  // up on every install. Only fills values that are missing, so it never
+  // clobbers changes the tester makes later.
+  // NOTE: strip this before any upstream PR — no repo URLs should ship.
+  void _seedBetaDefaults(Isar isar) {
+    const repoUrls = [
+      'https://raw.githubusercontent.com/Swakshan/mangayomi-swak-extensions/refs/heads/main/anime_index.json',
+      'https://raw.githubusercontent.com/Mallyd11/mangayomi-anime-extensions/main/anime_index.json',
+    ];
+    try {
+      final settings = isar.settings.getSync(227);
+      if (settings == null) return;
+      var changed = false;
+
+      final existing = settings.animeExtensionsRepo ?? <Repo>[];
+      // "First run" = our seed repos are not all present yet. initDB runs on
+      // every launch, so anything that must fire only once keys off this.
+      final firstRun = !repoUrls.every(
+        (url) => existing.any((r) => r.jsonUrl == url),
+      );
+
+      final repos = [...existing];
+      for (final url in repoUrls) {
+        if (!repos.any((r) => r.jsonUrl == url)) {
+          repos.add(Repo(jsonUrl: url));
+          changed = true;
+        }
+      }
+
+      // Default to dark only on that first run, and only while both theme flags
+      // are still at their factory defaults. Never re-forces it afterwards, so a
+      // tester who switches to light stays on light.
+      if (firstRun &&
+          (settings.themeIsDark ?? false) == false &&
+          (settings.followSystemTheme ?? false) == false) {
+        settings.themeIsDark = true;
+        changed = true;
+      }
+
+      if (changed) {
+        isar.writeTxnSync(
+          () => isar.settings.putSync(settings..animeExtensionsRepo = repos),
+        );
+      }
+    } catch (_) {}
   }
 }
