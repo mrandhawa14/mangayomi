@@ -4,13 +4,16 @@ name: Desktop beta build
 # built with --dart-define=ALLOW_FORCE_TV=true so the "Force TV mode" toggle
 # (Settings › General) works in a release build. Testers flip it and restart to
 # try the Android-TV UI on a Mac/PC with arrow keys. Release (not debug) so they
-# run standalone. Tag-triggered (desktop-beta-*); uploads artifacts to attach to
-# the beta release afterwards.
+# run standalone. Tag-triggered (desktop-beta-*); each platform is published as
+# an asset on the tag's pre-release, and also kept as a run artifact.
 on:
   push:
     tags:
       - "desktop-beta-*"
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 concurrency:
   group: desktop-beta-${{ github.ref }}
@@ -43,6 +46,13 @@ jobs:
           name: mangayomi-tvbeta-macos-dmg
           path: mangayomi-tvbeta-macos.dmg
           if-no-files-found: error
+      - name: Publish to the beta release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Mangayomi desktop beta ${{ github.ref_name }}
+          prerelease: true
+          files: mangayomi-tvbeta-macos.dmg
 
   windows:
     runs-on: windows-latest
@@ -80,6 +90,13 @@ jobs:
           name: mangayomi-tvbeta-windows-zip
           path: mangayomi-tvbeta-windows.zip
           if-no-files-found: error
+      - name: Publish to the beta release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Mangayomi desktop beta ${{ github.ref_name }}
+          prerelease: true
+          files: mangayomi-tvbeta-windows.zip
 
   linux:
     runs-on: ubuntu-latest
@@ -109,3 +126,10 @@ jobs:
           name: mangayomi-tvbeta-linux-zip
           path: mangayomi-tvbeta-linux.zip
           if-no-files-found: error
+      - name: Publish to the beta release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Mangayomi desktop beta ${{ github.ref_name }}
+          prerelease: true
+          files: mangayomi-tvbeta-linux.zip
