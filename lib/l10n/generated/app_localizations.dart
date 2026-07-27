@@ -4570,6 +4570,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off. Add a wait with random jitter between chapters to be gentler on sources.'**
   String get download_delay_subtitle;
+
+  /// No description provided for @app_ui_scale.
+  ///
+  /// In en, this message translates to:
+  /// **'Interface scale'**
+  String get app_ui_scale;
+
+  /// No description provided for @app_ui_scale_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Make the interface larger or smaller to suit your screen and viewing distance.'**
+  String get app_ui_scale_subtitle;
 }
 
 class _AppLocalizationsDelegate

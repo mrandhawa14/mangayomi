@@ -2465,4 +2465,11 @@ class AppLocalizationsTh extends AppLocalizations {
   @override
   String get download_delay_subtitle =>
       'Off. Add a wait with random jitter between chapters to be gentler on sources.';
+
+  @override
+  String get app_ui_scale => 'Interface scale';
+
+  @override
+  String get app_ui_scale_subtitle =>
+      'Make the interface larger or smaller to suit your screen and viewing distance.';
 }
