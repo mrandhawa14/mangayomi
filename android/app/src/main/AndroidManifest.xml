@@ -88,5 +88,13 @@
             android:name="flutterEmbedding"
             android:value="2" />
         <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
+        <!-- Fall back to the Skia renderer on Android. Impeller (the default on
+             recent Flutter, pulled in when the native-assets FFI decoder bumped
+             the Flutter version) janks app-wide on many Android devices in this
+             range (reader scroll, tab switching); Skia restores v7.8 smoothness.
+             iOS is unaffected and keeps Impeller. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
     </application>
 </manifest>
