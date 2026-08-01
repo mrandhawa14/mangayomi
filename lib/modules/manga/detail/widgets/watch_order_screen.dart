@@ -172,7 +172,7 @@ class _WatchOrderScreenState extends State<WatchOrderScreen> {
     // stretching a single column across the whole panel.
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620),
+        constraints: const BoxConstraints(maxWidth: 820),
         child: ListView.builder(
           padding: tvPageInsets,
           itemCount: items.length,
@@ -194,7 +194,7 @@ class _WatchOrderScreenState extends State<WatchOrderScreen> {
                       // Cover, then a short connector stub down to the next
                       // cover so the chain reads as an ordered rail.
                       SizedBox(
-                        width: 112,
+                        width: 132,
                         child: Column(
                           children: [
                             _cover(context, item.image, isCurrent: isCurrent),
@@ -273,8 +273,8 @@ class _WatchOrderScreenState extends State<WatchOrderScreen> {
     String? imageUrl, {
     required bool isCurrent,
   }) {
-    final width = isCurrent ? 98.0 : 82.0;
-    final height = isCurrent ? 142.0 : 118.0;
+    final width = isCurrent ? 120.0 : 100.0;
+    final height = isCurrent ? 174.0 : 146.0;
     return Container(
       width: width,
       height: height,

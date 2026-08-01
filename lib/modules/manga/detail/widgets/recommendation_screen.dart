@@ -85,7 +85,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                   padding: tvPageInsets,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
-                    mainAxisExtent: 132,
+                    mainAxisExtent: 152,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
                   ),
@@ -123,8 +123,8 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                 borderRadius: BorderRadius.circular(6),
                 child: Image(
                   image: coverProvider(toImgUrl(coverUrl)),
-                  width: 78,
-                  height: 116,
+                  width: 94,
+                  height: 138,
                   fit: BoxFit.cover,
                 ),
               ),
