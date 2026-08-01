@@ -167,119 +167,63 @@ class _WatchOrderScreenState extends State<WatchOrderScreen> {
   // width empty. "Current" is the anchor (enlarged cover + accent ring + a filled
   // badge); position carries previous vs up next.
   Widget _timeline(List<WatchOrderItem> items) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final horizontal = isTv || constraints.maxWidth >= 720;
-        return horizontal
-            ? _timelineHorizontal(items)
-            : _timelineVertical(items);
-      },
-    );
-  }
-
-  Widget _timelineVertical(List<WatchOrderItem> items) {
-    return ListView.builder(
-      padding: tvPageInsets,
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final isCurrent = item.role == WatchOrderRole.current;
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => _openWatchOrder(item),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    width: 76,
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 4),
-                        _cover(context, item.image, isCurrent: isCurrent),
-                        if (index != items.length - 1)
-                          Expanded(
-                            child: Center(
-                              child: Container(
+    // One layout on every form factor: a vertical rail. On a wide TV/desktop
+    // window it centres at a comfortable width with side padding rather than
+    // stretching a single column across the whole panel.
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620),
+        child: ListView.builder(
+          padding: tvPageInsets,
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final item = items[index];
+            final isLast = index == items.length - 1;
+            final isCurrent = item.role == WatchOrderRole.current;
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                autofocus: isTv && index == 0,
+                focusColor: context.primaryColor.withValues(alpha: 0.12),
+                onTap: () => _openWatchOrder(item),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Cover, then a short connector stub down to the next
+                      // cover so the chain reads as an ordered rail.
+                      SizedBox(
+                        width: 112,
+                        child: Column(
+                          children: [
+                            _cover(context, item.image, isCurrent: isCurrent),
+                            if (!isLast)
+                              Container(
                                 width: 2,
-                                color: context.textColor.withValues(alpha: 0.14),
+                                height: 22,
+                                color: context.textColor.withValues(
+                                  alpha: 0.16,
+                                ),
                               ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 6, bottom: 22),
-                      child: _timelineBody(context, item),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _timelineHorizontal(List<WatchOrderItem> items) {
-    return ListView.separated(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
-      itemCount: items.length,
-      separatorBuilder: (_, _) => const SizedBox(width: 12),
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final isCurrent = item.role == WatchOrderRole.current;
-        return Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            autofocus: isTv && index == 0,
-            focusColor: context.primaryColor.withValues(alpha: 0.16),
-            onTap: () => _openWatchOrder(item),
-            child: SizedBox(
-              width: 128,
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      height: 104,
-                      child: Center(
-                        child: _cover(
-                          context,
-                          item.image,
-                          isCurrent: isCurrent,
+                          ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      item.name,
-                      maxLines: 2,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: _timelineBody(context, item),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 5),
-                    _roleBadge(context, item.role),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -329,8 +273,8 @@ class _WatchOrderScreenState extends State<WatchOrderScreen> {
     String? imageUrl, {
     required bool isCurrent,
   }) {
-    final width = isCurrent ? 62.0 : 50.0;
-    final height = isCurrent ? 90.0 : 72.0;
+    final width = isCurrent ? 98.0 : 82.0;
+    final height = isCurrent ? 142.0 : 118.0;
     return Container(
       width: width,
       height: height,

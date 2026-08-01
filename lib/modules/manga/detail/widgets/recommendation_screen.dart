@@ -76,16 +76,24 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
           // keeps it one column on a phone and reflows to two or more on a wider
           // TV/desktop window (maxCrossAxisExtent), so the rows never stretch
           // into empty space.
-          : GridView.builder(
-              padding: tvPageInsets,
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 480,
-                mainAxisExtent: 132,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-              ),
-              itemCount: data!.length,
-              itemBuilder: (context, index) => _card(context, data![index], index),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                // One column on a phone, two on anything wider, and never more
+                // than two even on a large TV/desktop window.
+                final columns = constraints.maxWidth >= 700 ? 2 : 1;
+                return GridView.builder(
+                  padding: tvPageInsets,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    mainAxisExtent: 132,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  itemCount: data!.length,
+                  itemBuilder: (context, index) =>
+                      _card(context, data![index], index),
+                );
+              },
             ),
     );
   }
