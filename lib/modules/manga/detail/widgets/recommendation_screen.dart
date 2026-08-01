@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
-import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
-import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
-import 'package:mangayomi/modules/widgets/gridview_widget.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/recommendation.dart';
 import 'package:mangayomi/utils/cached_network.dart';
@@ -74,68 +71,148 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
           ? Center(child: Text(_errorMessage))
           : (data == null || data!.isEmpty)
           ? Center(child: Text(l10n.no_result))
-          // Cover-forward grid: the poster is the tile, the title sits beneath
-          // it, and the similarity score is a small corner badge. The old layout
-          // rendered the whole synopsis inline, growing each row so tall that
-          // barely a cover was visible on screen (worse on TV, where you browse
-          // by cover).
-          : GridViewWidget(
-              // Comfortable-grid ratios (cover plus one title line), matching
-              // the library grid; a touch taller on TV so the focus ring and
-              // title have room.
-              childAspectRatio: isTv ? 0.60 : 0.642,
+          // Poster list: a big cover, the similarity score as a filled pill, the
+          // title, a two-line capped synopsis and genre chips. The grid delegate
+          // keeps it one column on a phone and reflows to two or more on a wider
+          // TV/desktop window (maxCrossAxisExtent), so the rows never stretch
+          // into empty space.
+          : GridView.builder(
+              padding: tvPageInsets,
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 480,
+                mainAxisExtent: 132,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+              ),
               itemCount: data!.length,
-              itemBuilder: (context, index) {
-                final rec = data![index];
-                final title =
-                    rec.titleEnglish ??
-                    rec.titleRomaji ??
-                    rec.titleNative ??
-                    "";
-                final coverUrl = rec.imgURLs.isNotEmpty
-                    ? rec.imgURLs.first
-                    : "";
-                return CoverViewWidget(
-                  // First cover autofocuses on TV so d-pad focus reaches the
-                  // grid instead of getting stuck on the app bar.
-                  autofocus: isTv && index == 0,
-                  isComfortableGrid: true,
-                  image: coverProvider(toImgUrl(coverUrl)),
-                  bottomTextWidget: BottomTextWidget(
-                    maxLines: 1,
-                    text: title,
-                    isComfortableGrid: true,
-                  ),
-                  onTap: () => context.push(
-                    '/globalSearch',
-                    extra: (title, widget.itemType),
-                  ),
-                  children: [
-                    Positioned(
-                      top: 6,
-                      left: 6,
-                      child: _scoreBadge(context, rec.score),
-                    ),
-                  ],
-                );
-              },
+              itemBuilder: (context, index) => _card(context, data![index], index),
             ),
     );
   }
 
-  Widget _scoreBadge(BuildContext context, int score) {
+  Widget _card(BuildContext context, RecommendationResult rec, int index) {
+    final title =
+        rec.titleEnglish ?? rec.titleRomaji ?? rec.titleNative ?? "";
+    final coverUrl = rec.imgURLs.isNotEmpty ? rec.imgURLs.first : "";
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        // On TV the first card autofocuses and the focus tint marks the target.
+        autofocus: isTv && index == 0,
+        focusColor: context.primaryColor.withValues(alpha: 0.16),
+        onTap: () => context.push(
+          '/globalSearch',
+          extra: (title, widget.itemType),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image(
+                  image: coverProvider(toImgUrl(coverUrl)),
+                  width: 78,
+                  height: 116,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _scorePill(context, rec.score),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (rec.description != null &&
+                        rec.description!.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        rec.description!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.35,
+                          color: context.textColor.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                    if (rec.genres.isNotEmpty) ...[
+                      const SizedBox(height: 7),
+                      Wrap(
+                        spacing: 5,
+                        runSpacing: 4,
+                        children: [
+                          for (final g in rec.genres.take(3)) _chip(context, g),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Filled with the accent; the label colour is chosen for contrast against the
+  // accent (not the theme), so the score stays readable on any accent hue.
+  Widget _scorePill(BuildContext context, int score) {
+    final accent = context.primaryColor;
+    final onAccent = accent.computeLuminance() > 0.5
+        ? Colors.black
+        : Colors.white;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: context.primaryColor,
+        color: accent,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         "$score%",
         style: TextStyle(
-          color: context.dynamicWhiteBlackColor,
           fontSize: 11,
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w800,
+          color: onAccent,
+        ),
+      ),
+    );
+  }
+
+  Widget _chip(BuildContext context, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: context.textColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 10.5,
+          color: context.textColor.withValues(alpha: 0.7),
         ),
       ),
     );
