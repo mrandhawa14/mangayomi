@@ -2,16 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
-import 'package:mangayomi/modules/widgets/custom_extended_image_provider.dart';
-import 'package:mangayomi/modules/widgets/progress_center.dart';
+import 'package:mangayomi/modules/widgets/bottom_text_widget.dart';
+import 'package:mangayomi/modules/widgets/cover_view_widget.dart';
+import 'package:mangayomi/modules/widgets/gridview_widget.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
 import 'package:mangayomi/services/recommendation.dart';
+import 'package:mangayomi/utils/cached_network.dart';
 import 'package:mangayomi/utils/constant.dart';
 import 'package:mangayomi/utils/extensions/build_context_extensions.dart';
-import 'package:marquee/marquee.dart';
-import 'package:photo_view/photo_view.dart';
-import 'package:photo_view/photo_view_gallery.dart';
-import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:mangayomi/utils/platform_utils.dart';
 
 class RecommendationScreen extends StatefulWidget {
@@ -70,316 +68,76 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.recommendations)),
-      body: Padding(
-        padding: EdgeInsetsGeometry.all(5),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Builder(
-                builder: (context) {
-                  if (_errorMessage.isNotEmpty) {
-                    return Center(child: Text(_errorMessage));
-                  }
-                  if (data != null && data!.isNotEmpty) {
-                    return SuperListView.builder(
-                      padding: tvPageInsets,
-                      extentPrecalculationPolicy: SuperPrecalculationPolicy(),
-                      itemCount: data!.length,
-                      itemBuilder: (context, index) {
-                        final recommendation = data![index];
-                        return ListTile(
-                          onTap: () => context.push(
-                            '/globalSearch',
-                            extra: (
-                              recommendation.titleEnglish ??
-                                  recommendation.titleRomaji ??
-                                  recommendation.titleNative,
-                              widget.itemType,
-                            ),
-                          ),
-                          title: Row(
-                            children: [
-                              if (recommendation.imgURLs.isNotEmpty)
-                                _thumbnailPreview(
-                                  context,
-                                  recommendation.imgURLs.first,
-                                ),
-                              const SizedBox(width: 15),
-                              recommendation.description != null
-                                  ? Flexible(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          _buildTitle(
-                                            recommendation.titleEnglish ??
-                                                recommendation.titleRomaji ??
-                                                recommendation.titleNative ??
-                                                "",
-                                            context,
-                                          ),
-                                          Text(
-                                            recommendation.description!,
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                            ),
-                                            overflow: TextOverflow.clip,
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  : Flexible(
-                                      child: _buildTitle(
-                                        recommendation.titleEnglish ??
-                                            recommendation.titleRomaji ??
-                                            recommendation.titleNative ??
-                                            "",
-                                        context,
-                                      ),
-                                    ),
-                            ],
-                          ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                  ),
-                                  child: recommendation.genres.isEmpty
-                                      ? const SizedBox(height: 15)
-                                      : context.isTablet
-                                      ? Wrap(
-                                          children: [
-                                            for (
-                                              var i = 0;
-                                              i < recommendation.genres.length;
-                                              i++
-                                            )
-                                              Padding(
-                                                padding: const EdgeInsets.only(
-                                                  left: 2,
-                                                  right: 2,
-                                                  bottom: 5,
-                                                ),
-                                                child: SizedBox(
-                                                  height: 30,
-                                                  child: ElevatedButton(
-                                                    style: ElevatedButton.styleFrom(
-                                                      elevation: 0,
-                                                      backgroundColor: Colors
-                                                          .grey
-                                                          .withValues(
-                                                            alpha: 0.2,
-                                                          ),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              5,
-                                                            ),
-                                                      ),
-                                                    ),
-                                                    onPressed: null,
-                                                    child: Text(
-                                                      recommendation.genres[i],
-                                                      style: TextStyle(
-                                                        fontSize: 11.5,
-                                                        color: context.isLight
-                                                            ? Colors.black
-                                                            : Colors.white,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        )
-                                      : SingleChildScrollView(
-                                          scrollDirection: Axis.horizontal,
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.start,
-                                            children: [
-                                              for (
-                                                var i = 0;
-                                                i <
-                                                    recommendation
-                                                        .genres
-                                                        .length;
-                                                i++
-                                              )
-                                                Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                        left: 2,
-                                                        right: 2,
-                                                        bottom: 5,
-                                                      ),
-                                                  child: SizedBox(
-                                                    height: 30,
-                                                    child: ElevatedButton(
-                                                      style: ElevatedButton.styleFrom(
-                                                        elevation: 0,
-                                                        backgroundColor: Colors
-                                                            .grey
-                                                            .withValues(
-                                                              alpha: 0.2,
-                                                            ),
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                5,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                      onPressed: () {},
-                                                      child: Text(
-                                                        recommendation
-                                                            .genres[i],
-                                                        style: TextStyle(
-                                                          fontSize: 11.5,
-                                                          color: context.isLight
-                                                              ? Colors.black
-                                                              : Colors.white,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                ),
-                                const SizedBox(width: 15),
-                                Text(
-                                  "${recommendation.score}% ${l10n.recommendations_similar}",
-                                  style: TextStyle(
-                                    background: Paint()
-                                      ..color = Theme.of(context)
-                                          .scaffoldBackgroundColor
-                                          .withValues(alpha: 0.75)
-                                      ..strokeWidth = 30.0
-                                      ..strokeJoin = StrokeJoin.round
-                                      ..style = PaintingStyle.stroke,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  }
-                  return Center(child: Text(l10n.no_result));
-                },
-              ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage.isNotEmpty
+          ? Center(child: Text(_errorMessage))
+          : (data == null || data!.isEmpty)
+          ? Center(child: Text(l10n.no_result))
+          // Cover-forward grid: the poster is the tile, the title sits beneath
+          // it, and the similarity score is a small corner badge. The old layout
+          // rendered the whole synopsis inline, growing each row so tall that
+          // barely a cover was visible on screen (worse on TV, where you browse
+          // by cover).
+          : GridViewWidget(
+              // Comfortable-grid ratios (cover plus one title line), matching
+              // the library grid; a touch taller on TV so the focus ring and
+              // title have room.
+              childAspectRatio: isTv ? 0.60 : 0.642,
+              itemCount: data!.length,
+              itemBuilder: (context, index) {
+                final rec = data![index];
+                final title =
+                    rec.titleEnglish ??
+                    rec.titleRomaji ??
+                    rec.titleNative ??
+                    "";
+                final coverUrl = rec.imgURLs.isNotEmpty
+                    ? rec.imgURLs.first
+                    : "";
+                return CoverViewWidget(
+                  // First cover autofocuses on TV so d-pad focus reaches the
+                  // grid instead of getting stuck on the app bar.
+                  autofocus: isTv && index == 0,
+                  isComfortableGrid: true,
+                  image: coverProvider(toImgUrl(coverUrl)),
+                  bottomTextWidget: BottomTextWidget(
+                    maxLines: 1,
+                    text: title,
+                    isComfortableGrid: true,
+                  ),
+                  onTap: () => context.push(
+                    '/globalSearch',
+                    extra: (title, widget.itemType),
+                  ),
+                  children: [
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: _scoreBadge(context, rec.score),
+                    ),
+                  ],
+                );
+              },
+            ),
+    );
+  }
+
+  Widget _scoreBadge(BuildContext context, int score) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: context.primaryColor,
+        borderRadius: BorderRadius.circular(6),
       ),
-    );
-  }
-
-  Widget _buildTitle(String text, BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Make sure that (constraints.maxWidth - (35 + 5)) is strictly positive.
-        final double availableWidth = constraints.maxWidth - (35 + 5);
-        final textPainter =
-            TextPainter(
-              text: TextSpan(text: text, style: const TextStyle(fontSize: 13)),
-              maxLines: 1,
-              textDirection: TextDirection.ltr,
-            )..layout(
-              maxWidth: availableWidth > 0 ? availableWidth : 1.0,
-            ); // - Download icon size (download_page_widget.dart, Widget Build SizedBox width: 35)
-
-        final isOverflowing = textPainter.didExceedMaxLines;
-
-        if (isOverflowing) {
-          return SizedBox(
-            height: 20,
-            child: Marquee(
-              text: text,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-              blankSpace: 40.0,
-              velocity: 30.0,
-              pauseAfterRound: const Duration(seconds: 1),
-              startPadding: 10.0,
-            ),
-          );
-        } else {
-          return Text(
-            text,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-            overflow: TextOverflow.ellipsis,
-          );
-        }
-      },
-    );
-  }
-
-  Widget _thumbnailPreview(BuildContext context, String? imageUrl) {
-    final imageProvider = CustomExtendedNetworkImageProvider(
-      toImgUrl(imageUrl ?? ""),
-    );
-    return Padding(
-      padding: const EdgeInsets.all(3),
-      child: GestureDetector(
-        onTap: () {
-          _openImage(context, imageProvider);
-        },
-        child: SizedBox(
-          width: 100,
-          height: 150,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.all(Radius.circular(5)),
-              image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
-            ),
-          ),
+      child: Text(
+        "$score%",
+        style: TextStyle(
+          color: context.dynamicWhiteBlackColor,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
-  }
-
-  void _openImage(BuildContext context, ImageProvider imageProvider) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Stack(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: PhotoViewGallery.builder(
-                  backgroundDecoration: const BoxDecoration(
-                    color: Colors.transparent,
-                  ),
-                  itemCount: 1,
-                  builder: (context, index) {
-                    return PhotoViewGalleryPageOptions(
-                      imageProvider: imageProvider,
-                      minScale: PhotoViewComputedScale.contained,
-                      maxScale: 2.0,
-                    );
-                  },
-                  loadingBuilder: (context, event) {
-                    return const ProgressCenter();
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class SuperPrecalculationPolicy extends ExtentPrecalculationPolicy {
-  @override
-  bool shouldPrecalculateExtents(ExtentPrecalculationContext context) {
-    return context.numberOfItems < 100;
   }
 }
