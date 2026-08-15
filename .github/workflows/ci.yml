@@ -156,8 +156,10 @@ jobs:
       - name: Install flutter_rust_bridge_codegen
         run: cargo install 'flutter_rust_bridge_codegen'
 
-      - name: Select Xcode 16.4
-        run: sudo xcode-select --switch /Applications/Xcode_16.4.app || true
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.3'
 
       - name: Install dependencies
         run: flutter pub get
