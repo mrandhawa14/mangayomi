@@ -14,6 +14,11 @@ final bool isMobile = Platform.isAndroid || Platform.isIOS;
 /// macOS or iOS
 final bool isApple = Platform.isMacOS || Platform.isIOS;
 
+/// Platforms using the floating capsule navigation bar rather than the
+/// material one. Apple only for now; Android, Windows and Linux still take the
+/// material bar or the rail.
+final bool usesFloatingNav = isApple;
+
 /// What the device reported, hydrated once at startup by [initIsTv].
 bool _isTvDetected = false;
 
