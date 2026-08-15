@@ -1,0 +1,114 @@
+name: Desktop beta build
+
+# Release desktop builds for testers — macOS .dmg, Windows .zip, Linux .zip —
+# built with --dart-define=ALLOW_FORCE_TV=true so the "Force TV mode" toggle
+# (Settings › General) works in a release build. Testers flip it and restart to
+# try the Android-TV UI on a Mac/PC with arrow keys. Release (not debug) so they
+# run standalone. Tag-triggered (desktop-beta-*); each platform is published as
+# an asset on the tag's pre-release, and also kept as a run artifact.
+on:
+  push:
+    tags:
+      - "desktop-beta-*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-beta-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen
+      - name: Pub get
+        run: flutter pub get
+      - name: Build macOS (release, allow force-TV)
+        run: flutter build macos --release --dart-define=ALLOW_FORCE_TV=true
+      - name: Package .dmg
+        run: |
+          APP=$(ls -d build/macos/Build/Products/Release/*.app | head -1)
+          echo "Packaging $APP"
+          hdiutil create -volname "Mangayomi tab bar" \
+            -srcfolder "$APP" -ov -format UDZO mangayomi-tabbar-macos.dmg
+          ls -lah mangayomi-tabbar-macos.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mangayomi-tabbar-macos-dmg
+          path: mangayomi-tabbar-macos.dmg
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    env:
+      # The runner's newest MSVC (VS 18) turns the <experimental/coroutine>
+      # deprecation into a hard error (STL1011); local_auth_windows and
+      # permission_handler_windows (C++/WinRT) still include it. Silence it via
+      # the CL env var, which cl.exe prepends to every compile.
+      CL: /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS=1
+    steps:
+      - uses: actions/checkout@v4
+      # cargokit's symlink resolver (flutter_discord_rpc_fork) uses Get-Item,
+      # which can't read hidden folders — and the pub cache lives under the
+      # hidden %USERPROFILE%\AppData, so the Windows build fails with
+      # "Get-Item: Could not find item ...\AppData". Clear the hidden attribute.
+      - name: Un-hide AppData for cargokit
+        shell: pwsh
+        run: attrib -s -h "$env:USERPROFILE\AppData"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen
+      - name: Pub get
+        run: flutter pub get
+      - name: Build Windows (release, allow force-TV)
+        run: flutter build windows --release --dart-define=ALLOW_FORCE_TV=true
+      - name: Zip Windows build
+        run: |
+          Set-Location -Path "build/windows/x64/runner/Release"
+          Compress-Archive -Path * -DestinationPath "$env:GITHUB_WORKSPACE/mangayomi-tabbar-windows.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mangayomi-tabbar-windows-zip
+          path: mangayomi-tabbar-windows.zip
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y webkit2gtk-4.1 clang cmake ninja-build \
+            pkg-config libgtk-3-dev mpv libmpv-dev libblkid-dev liblzma-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen
+      - name: Pub get
+        run: flutter pub get
+      - name: Build Linux (release, allow force-TV)
+        run: flutter build linux --release --dart-define=ALLOW_FORCE_TV=true
+      - name: Zip Linux bundle
+        run: |
+          cd build/linux/x64/release/bundle
+          zip -qry "$GITHUB_WORKSPACE/mangayomi-tabbar-linux.zip" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mangayomi-tabbar-linux-zip
+          path: mangayomi-tabbar-linux.zip
+          if-no-files-found: error
