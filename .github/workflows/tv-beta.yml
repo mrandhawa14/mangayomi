@@ -43,10 +43,13 @@ jobs:
           STORE_PASSWORD: ${{ secrets.TV_BETA_STORE_PASSWORD }}
         run: |
           echo "$KEYSTORE_B64" | base64 --decode > android/tv-beta.jks
-          # android/app/build.gradle reads rootProject.file('key.properties'),
-          # which is android/key.properties.
+          # Two different roots, which is the trap here. key.properties is read
+          # with rootProject.file(), so it belongs at android/key.properties.
+          # storeFile is then resolved by file() inside android/app, so a bare
+          # name is looked for in android/app rather than next to the
+          # properties. Absolute, so neither root matters.
           cat > android/key.properties <<PROPS
-          storeFile=tv-beta.jks
+          storeFile=$GITHUB_WORKSPACE/android/tv-beta.jks
           storePassword=$STORE_PASSWORD
           keyAlias=$KEY_ALIAS
           keyPassword=$KEY_PASSWORD
