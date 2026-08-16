@@ -1,0 +1,72 @@
+# Signed TV test builds, for this fork only.
+#
+# Never send this upstream. It exists so a release APK can be put on a Fire TV
+# without a local Android SDK, and it depends on TV_BETA_* secrets that only
+# this fork has.
+#
+# Push a tag to use it:
+#   git tag tv-beta-2026-08-15 && git push fork tv-beta-2026-08-15
+name: TV beta
+
+on:
+  push:
+    tags:
+      - "tv-beta-*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # Release rather than debug on purpose. A debug APK runs the JIT with no
+      # tree shaking, which is slow enough on a television to be worthless for
+      # judging how the app actually performs there.
+      - name: Restore the signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.TV_BETA_KEYSTORE_B64 }}
+          KEY_ALIAS: ${{ secrets.TV_BETA_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.TV_BETA_KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.TV_BETA_STORE_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 --decode > android/tv-beta.jks
+          # android/app/build.gradle reads rootProject.file('key.properties'),
+          # which is android/key.properties.
+          cat > android/key.properties <<PROPS
+          storeFile=tv-beta.jks
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          PROPS
+
+      - run: flutter pub get
+
+      - run: flutter build apk --release
+
+      - name: Forget the signing key
+        if: always()
+        run: rm -f android/tv-beta.jks android/key.properties
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          name: "TV beta ${{ github.ref_name }}"
+          body: |
+            Unofficial test build of this fork, for sideloading onto a
+            television. Not a release of the upstream project.
+
+            Commit: ${{ github.sha }}
+          files: build/app/outputs/flutter-apk/app-release.apk
