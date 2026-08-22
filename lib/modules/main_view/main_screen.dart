@@ -24,11 +24,13 @@ import 'package:mangayomi/modules/widgets/floating_nav_bar.dart';
 import 'package:mangayomi/modules/widgets/loading_icon.dart';
 import 'package:mangayomi/services/fetch_item_sources.dart';
 import 'package:mangayomi/modules/main_view/nav_shrink.dart';
+import 'package:mangayomi/modules/main_view/providers/swipe_tabs_provider.dart';
 import 'package:mangayomi/modules/main_view/providers/migration.dart';
 import 'package:mangayomi/modules/main_view/providers/tv_mode_provider.dart';
 import 'package:mangayomi/modules/more/about/providers/check_for_update.dart';
 import 'package:mangayomi/modules/more/data_and_storage/providers/auto_backup.dart';
 import 'package:mangayomi/providers/l10n_providers.dart';
+import 'package:mangayomi/modules/main_view/nav_shell_container.dart';
 import 'package:mangayomi/router/router.dart';
 import 'package:mangayomi/services/fetch_sources_list.dart';
 import 'package:mangayomi/services/sync_server.dart';
@@ -133,6 +135,32 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     return null;
   }
 
+  /// Builds a tab screen for the swipe peek.
+  ///
+  /// Mirrors what the shell route builds. Route arguments are deliberately
+  /// left out: this instance lives only while a finger is down, and the shell
+  /// replaces it with the real one the moment the swipe commits.
+  /// Which shell branch each entry of the visible strip belongs to.
+  ///
+  /// The branches are declared in a fixed order by the router; the strip is
+  /// the user's own arrangement with hidden entries dropped, so the two need
+  /// mapping. Entries that are toggles rather than destinations have no branch
+  /// at all.
+  static const _branchForNav = {
+    "/MangaLibrary": 0,
+    "/AnimeLibrary": 1,
+    "/NovelLibrary": 2,
+    "/trackerLibrary": 3,
+    "/history": 4,
+    "/updates": 5,
+    "/browse": 6,
+    "/more": 7,
+  };
+
+  List<int?> _branchOrder(List<String> dest) => [
+    for (final nav in dest) _branchForNav[nav],
+  ];
+
   void _initializeTimers() {
     _backupTimer = Timer.periodic(
       const Duration(minutes: 5),
@@ -217,6 +245,12 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   int currentIndex = 0;
   bool isLibSwitch = false;
+
+  /// Where a page swipe is heading and how far along it is, so the navigation
+  /// bar's pill can follow the drag rather than only hearing about it once the
+  /// swipe has committed.
+  int? _swipeTarget;
+  double _swipeProgress = 0;
 
   /// Drives the floating bar stepping back while a page is scrolled down.
   final NavShrink _navShrink = NavShrink();
@@ -333,6 +367,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               final incognitoMode = ref.watch(incognitoModeStateProvider);
               final downloadedOnly = ref.watch(downloadedOnlyStateProvider);
               final isLongPressed = ref.watch(isLongPressedStateProvider);
+              final swipeTabs = ref.watch(swipeBetweenTabsProvider);
 
               return Column(
                 children: [
@@ -364,11 +399,44 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                                     _buildNavigationWidgetsDesktop,
                                 child: widget.child,
                               )
-                            : widget.child,
+                            : NavShellScope(
+                                order: _branchOrder(dest),
+                                currentIndex: currentIndex,
+                                // Off unless asked for, and never where the
+                                // gesture cannot be made: a TV has no touch
+                                // screen and a desktop pointer is a mouse.
+                                swipeEnabled: swipeTabs && !isLongPressed,
+                                onProgress: (target, progress) {
+                                  if (target == _swipeTarget &&
+                                      (progress - _swipeProgress).abs() <
+                                          0.005) {
+                                    return;
+                                  }
+                                  setState(() {
+                                    _swipeTarget = target;
+                                    _swipeProgress = progress;
+                                  });
+                                },
+                                onSwitch: (i) {
+                                  final nav = dest[i];
+                                  if (nav == "_enableLibSwitch") {
+                                    setState(() => isLibSwitch = true);
+                                    final target = _firstVisibleLibrary();
+                                    if (target != null) route.go(target);
+                                  } else if (nav == "_disableLibSwitch") {
+                                    setState(() => isLibSwitch = false);
+                                  } else {
+                                    route.go(nav);
+                                  }
+                                },
+                                child: widget.child,
+                              ),
                       ),
                       bottomNavigationBar: context.prefersNavRail
                           ? null
                           : _MobileBottomNavigation(
+                              swipeTarget: _swipeTarget,
+                              swipeProgress: _swipeProgress,
                               isLongPressed: isLongPressed,
                               location: location,
                               currentIndex: currentIndex,
@@ -972,6 +1040,8 @@ class _TabletLayoutState extends State<_TabletLayout> {
 
 class _MobileBottomNavigation extends StatelessWidget {
   const _MobileBottomNavigation({
+    this.swipeTarget,
+    this.swipeProgress = 0,
     required this.isLongPressed,
     required this.location,
     required this.currentIndex,
@@ -993,6 +1063,8 @@ class _MobileBottomNavigation extends StatelessWidget {
   final List<Widget> Function(WidgetRef, List<String>, BuildContext)
   buildNavigationWidgetsMobile;
   final Function(String) onDestinationSelected;
+  final int? swipeTarget;
+  final double swipeProgress;
 
   /// Passed through to the floating bar; 0 at rest, 1 while the page under it
   /// is being scrolled down.
@@ -1026,6 +1098,8 @@ class _MobileBottomNavigation extends StatelessWidget {
           // Landscape has width to spare and height to save, so the labels go
           // beside the icons rather than a rail taking over.
           showLabels: context.isLandscape,
+          swipeTarget: swipeTarget,
+          swipeProgress: swipeProgress,
           shrink: shrink,
           onWake: onWake,
         ),
