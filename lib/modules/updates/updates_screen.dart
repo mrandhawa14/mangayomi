@@ -220,8 +220,7 @@ class _UpdateTabState extends ConsumerState<UpdateTab>
                 .toSet()
                 .toList();
             final mangaById = {
-              for (final m in isar.mangas.getAllSync(mangaIds))
-                if (m != null) m.id!: m,
+              for (final m in isar.mangas.getAllSync(mangaIds)) m?.id!: m!,
             };
 
             // Both maps above skip an entry that no longer resolves, and the
