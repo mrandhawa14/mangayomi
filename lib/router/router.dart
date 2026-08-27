@@ -3,6 +3,7 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mangayomi/modules/main_view/nav_shell_container.dart';
 import 'package:mangayomi/models/manga.dart';
 import 'package:mangayomi/models/settings.dart';
 import 'package:mangayomi/models/source.dart';
@@ -130,20 +131,20 @@ class RouterNotifier extends ChangeNotifier {
     // Each tab lives in its own StatefulShellBranch so switching tabs keeps
     // the other screens mounted (scroll position, queries, images preserved).
     //
-    // Except on a television, where that retention is not affordable. Measured
-    // on a Fire TV: every branch left mounted holds roughly 14 MB of GPU
-    // surfaces, three tabs took Graphics from 27 MB to 69 MB, and the box has
-    // around 300 MB free with most of its swap already spent. Off TV the
-    // trade is the other way round and IndexedStack stays.
+    // Except on a television, where retention is not affordable. Measured on a
+    // Fire TV: every branch left mounted holds roughly 14 MB of GPU surfaces,
+    // three tabs took Graphics from 27 MB to 69 MB, and the box has around
+    // 300 MB free with most of its swap already spent.
+    //
+    // Off TV the trade runs the other way and NavShellContainer keeps every
+    // branch mounted, which is what lets a swipe hold two of them on screen at
+    // once. A television has no swipe to serve, so it gets the single branch.
     StatefulShellRoute(
       builder: (context, state, navigationShell) =>
           MainScreen(child: navigationShell),
       navigatorContainerBuilder: (context, navigationShell, children) => isTv
           ? children[navigationShell.currentIndex]
-          : IndexedStack(
-              index: navigationShell.currentIndex,
-              children: children,
-            ),
+          : NavShellContainer(shell: navigationShell, children: children),
       branches: [
         _branch(
           _genericRoute<String?>(
