@@ -175,7 +175,7 @@ class _WatchOrderScreenState extends State<WatchOrderScreen> {
   Widget _buildSequels() {
     if (sequels != null && sequels!.isNotEmpty) {
       return SuperListView.builder(
-        padding: tvPageInsets,
+        padding: tvPageInsets.add(pageBottomInsets(context)),
         extentPrecalculationPolicy: SuperPrecalculationPolicy(),
         itemCount: sequels!.length,
         itemBuilder: (context, index) {
@@ -249,7 +249,7 @@ class _WatchOrderScreenState extends State<WatchOrderScreen> {
         // short, and the current entry needs a laid out context for
         // ensureVisible to reach it while it is still off screen.
         child: SingleChildScrollView(
-          padding: tvPageInsets,
+          padding: tvPageInsets.add(pageBottomInsets(context)),
           child: Column(
             children: [
               for (var index = 0; index < items.length; index++)
@@ -429,7 +429,7 @@ class _WatchOrderScreenState extends State<WatchOrderScreen> {
 
   Widget _searchList(List<WatchOrderSearch> results) {
     return SuperListView.builder(
-      padding: tvPageInsets,
+      padding: tvPageInsets.add(pageBottomInsets(context)),
       extentPrecalculationPolicy: SuperPrecalculationPolicy(),
       itemCount: results.length,
       itemBuilder: (context, index) {
