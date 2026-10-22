@@ -12,6 +12,8 @@ on:
   push:
     tags:
       - "tv-beta-*"
+  # Run on a tv-beta-* tag ref when a tag push fails to start a build.
+  workflow_dispatch:
 
 permissions:
   contents: write
