@@ -2736,7 +2736,9 @@ mp.register_script_message('call_button_${button.id}_long', button${button.id}lo
       children: [
         if (_videoTextureVisible)
           Video(
-            pip: const PipConfig(autoEnter: true),
+            // No PiP on TV: Home there means leave, and a floating window
+            // has nowhere to go on a launcher.
+            pip: isTv ? null : const PipConfig(autoEnter: true),
             subtitleViewConfiguration: SubtitleViewConfiguration(
               visible: false,
               style: subtileTextStyle(ref),
